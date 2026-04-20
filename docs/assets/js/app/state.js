@@ -3,6 +3,7 @@ import { BenchmarkCharts } from "../charts.js";
 export const DATA_DIR = "data";
 export const INDEX_URL = `${DATA_DIR}/index.json`;
 
+export const SCOPE_ALL = "ALL";
 export const SCOPE_RC = "RC";
 export const SCOPE_LN = "LN";
 
@@ -23,6 +24,7 @@ export const state = {
     scopedBaseRows: [],
     scopedCompareRows: [],
 
+    allDisplayRows: [],
     displayRows: [],
     filteredRows: [],
     errorRows: [],

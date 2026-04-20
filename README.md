@@ -1,7 +1,7 @@
 # osumania_map_analyser
 **[English](README_EN.md) | 中文**
 ****
-本仓库是一个 [tosu](https://tosu.app) 游戏内叠加界面(ppcounter)，实时提供 osu!mania（4/6/7K） 下，lazer与stable的多个mod，提供估算难度、分析RC/LN键型、自定义ett版本计算MSD、难度图表和暂停检测功能。
+本仓库是一个 [tosu](https://tosu.app) 游戏内叠加界面(ppcounter)，实时在 osu!mania（4/6/7K） 下，lazer与stable的多个mod，提供估算难度、分析RC/LN键型、自定义ett版本计算MSD、难度图表和暂停检测功能。
 ![Features](img/features.gif)
 
 估计算法 Benchmark: 请前往[此处](https://leoblackmt.github.io/osumania_map_analyser/)查看基于真实谱面数据的估计算法表现对比。
@@ -35,7 +35,7 @@
 8. 如果存在问题欢迎提交issue。
 
 ## 设置说明
-注意：推荐你直接使用默认设置开始体验，之后再根据个人喜好进行调整。
+注意：推荐直接使用默认设置开始体验，之后再根据个人喜好进行调整。
 - **视觉设定**：
     - **Card Body Content**：选择在卡片主体显示的内容。
         - None: 不显示任何内容。即短卡片模式。

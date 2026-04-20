@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Estimator Algorithm Benchmark</title>
-    <link rel="icon" type="image/png" href="assets/images/icon.png?v=20260417f" />
-    <link rel="stylesheet" href="assets/css/theme.css?v=20260417f" />
-    <link rel="stylesheet" href="assets/css/layout.css?v=20260417f" />
-    <link rel="stylesheet" href="assets/css/components.css?v=20260417f" />
-    <script src="assets/vendor/chart.umd.min.js?v=20260417f"></script>
+    <link rel="icon" type="image/png" href="assets/images/icon.png?v=20260420b" />
+    <link rel="stylesheet" href="assets/css/theme.css?v=20260420b" />
+    <link rel="stylesheet" href="assets/css/layout.css?v=20260420b" />
+    <link rel="stylesheet" href="assets/css/components.css?v=20260420b" />
+    <script src="assets/vendor/chart.umd.min.js?v=20260420b"></script>
 </head>
 <body>
     <div class="bg-orb orb-a" aria-hidden="true"></div>
@@ -27,6 +27,14 @@
                 <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.64 7.64 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
             </svg>
         </a>
+        <a
+            class="help-float-btn"
+            href="help.html"
+            title="Open Help"
+            aria-label="Open Help"
+        >
+            <span>?</span>
+        </a>
 
         <section class="hero panel fade-in-up">
             <div class="hero-head">
@@ -34,6 +42,7 @@
                 <h1>Estimator Algorithm Benchmark</h1>
                 <p class="subtitle">
                     Compare expected difficulty against estimator output across every map with a variety of checks, and pattern/subPattern breakdowns. Use this dashboard to quickly view the overall performance of an algorithm, identify its strengths and weaknesses, and compare it against other algorithms in a head-to-head matchup.
+                    By the way, if you have more maps with expected estimation results, you can <a href="https://github.com/LeoBlackMT/osumania_map_analyser/issues" target="_blank" rel="noopener noreferrer">submit an issue</a> to the GitHub repository.
                 </p>
             </div>
 
@@ -46,6 +55,7 @@
                 <label class="toolbar-field" id="baseCategoryField">
                     <span>Scope</span>
                     <select id="baseCategorySelect" aria-label="Base category selector">
+                        <option value="ALL">All</option>
                         <option value="RC">RC</option>
                         <option value="LN">LN</option>
                     </select>
@@ -61,6 +71,7 @@
                 <label class="toolbar-field" id="compareCategoryField">
                     <span>Compare Scope</span>
                     <select id="compareCategorySelect" aria-label="Compare category selector">
+                        <option value="ALL">All</option>
                         <option value="RC">RC</option>
                         <option value="LN">LN</option>
                     </select>
@@ -281,7 +292,6 @@
                             <option value="close">Close</option>
                             <option value="moderate">Moderate</option>
                             <option value="miss">Miss</option>
-                            <option value="error">Error</option>
                         </select>
                     </label>
                     <button id="clearFilterButton" class="btn-ghost" type="button">Clear Filters</button>
@@ -345,6 +355,6 @@
         </section>
     </main>
 
-    <script type="module" src="assets/js/app.js?v=20260417f"></script>
+    <script type="module" src="assets/js/app.js?v=20260420b"></script>
 </body>
 </html>

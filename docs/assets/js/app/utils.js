@@ -11,8 +11,11 @@ export function normalizeSubPattern(value) {
     return text || "Unsigned";
 }
 
-export function normalizeScope(value, lnScope) {
+export function normalizeScope(value, lnScope, allScope = "ALL") {
     const text = String(value ?? "").trim().toUpperCase();
+    if (text === String(allScope).toUpperCase()) {
+        return String(allScope).toUpperCase();
+    }
     return text === lnScope ? lnScope : "RC";
 }
 
@@ -128,7 +131,7 @@ export function formatGotDifficultyFromNumeric(value, rowPattern) {
     const base = Math.round(value - tier.delta);
 
     if (normalizePattern(rowPattern) === "ln") {
-        return `${base} ${tier.label}`;
+        return `LN ${base} ${tier.label}`;
     }
 
     if (base === -2) {

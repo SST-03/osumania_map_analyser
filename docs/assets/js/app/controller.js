@@ -1,5 +1,12 @@
 import { computeHeadToHead, computeSummary } from "../stats.js";
-import { charts, dom, SCOPE_LN, SCOPE_RC, state } from "./state.js";
+import {
+    charts,
+    dom,
+    SCOPE_ALL,
+    SCOPE_LN,
+    SCOPE_RC,
+    state,
+} from "./state.js";
 import {
     normalizeScope,
     toErrorMessage,
@@ -46,7 +53,7 @@ function syncBaseScopeVisibility(rows) {
     const showLnChoice = meta.hasUsableLn;
     setFieldVisible(dom.baseCategoryField, showLnChoice);
 
-    if (!showLnChoice) {
+    if (!showLnChoice && state.baseMode === SCOPE_LN) {
         state.baseMode = SCOPE_RC;
     }
 
@@ -67,7 +74,7 @@ function syncCompareScopeVisibility(rows) {
     const showLnChoice = meta.hasUsableLn;
     setFieldVisible(dom.compareCategoryField, showLnChoice);
 
-    if (!showLnChoice) {
+    if (!showLnChoice && state.compareMode === SCOPE_LN) {
         state.compareMode = SCOPE_RC;
     }
 
@@ -120,6 +127,7 @@ function applyEmptyDashboard() {
     state.compareRows = [];
     state.scopedBaseRows = [];
     state.scopedCompareRows = [];
+    state.allDisplayRows = [];
     state.displayRows = [];
     state.filteredRows = [];
     state.fullSummary = emptySummary;
@@ -167,7 +175,13 @@ function applyFiltersAndRender() {
     updateSummary(activeSummary);
     updateInsightLists(activeSummary);
     updateCompareSummary(state.compareSummary);
-    renderErrorPanel(filtered);
+
+    const errorFilters = {
+        ...filters,
+        band: "all",
+    };
+    const errorScopeRows = filterDisplayRows(state.allDisplayRows, errorFilters);
+    renderErrorPanel(errorScopeRows);
 
     charts.render(activeSummary, state.compareSummary, {
         activeFilters: filters,
@@ -206,16 +220,18 @@ async function loadCurrentView(options = {}) {
         }
         syncCompareScopeVisibility(state.compareRows);
 
-        state.scopedBaseRows = applyScopeRows(state.baseRows, state.baseMode, SCOPE_LN);
+        state.scopedBaseRows = applyScopeRows(state.baseRows, state.baseMode, SCOPE_LN, SCOPE_ALL);
         state.scopedCompareRows = state.compareAlgorithm
-            ? applyScopeRows(state.compareRows, state.compareMode, SCOPE_LN)
+            ? applyScopeRows(state.compareRows, state.compareMode, SCOPE_LN, SCOPE_ALL)
             : [];
 
-        state.displayRows = mergeRowsForDisplay(
+        state.allDisplayRows = mergeRowsForDisplay(
             state.scopedBaseRows,
             state.scopedCompareRows,
             Boolean(state.compareAlgorithm),
         );
+
+        state.displayRows = state.allDisplayRows.filter((row) => !row._errorInfo);
 
         state.fullSummary = computeSummary(state.scopedBaseRows);
 
@@ -299,7 +315,7 @@ function bindEvents() {
     });
 
     dom.baseCategorySelect.addEventListener("change", async () => {
-        state.baseMode = normalizeScope(dom.baseCategorySelect.value, SCOPE_LN);
+        state.baseMode = normalizeScope(dom.baseCategorySelect.value, SCOPE_LN, SCOPE_ALL);
         await loadCurrentView();
     });
 
@@ -310,7 +326,7 @@ function bindEvents() {
     });
 
     dom.compareCategorySelect.addEventListener("change", async () => {
-        state.compareMode = normalizeScope(dom.compareCategorySelect.value, SCOPE_LN);
+        state.compareMode = normalizeScope(dom.compareCategorySelect.value, SCOPE_LN, SCOPE_ALL);
         await loadCurrentView();
     });
 
@@ -414,8 +430,8 @@ export async function init() {
     const requestedBase = findAlgorithmByLooseName(search.get("algorithm"));
     const requestedCompare = findAlgorithmByLooseName(search.get("compare"));
 
-    state.baseMode = normalizeScope(search.get("scope"), SCOPE_LN);
-    state.compareMode = normalizeScope(search.get("compareScope"), SCOPE_LN);
+    state.baseMode = normalizeScope(search.get("scope"), SCOPE_LN, SCOPE_ALL);
+    state.compareMode = normalizeScope(search.get("compareScope"), SCOPE_LN, SCOPE_ALL);
 
     if (requestedBase) {
         state.currentAlgorithm = requestedBase;

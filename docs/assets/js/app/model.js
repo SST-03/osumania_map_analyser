@@ -116,7 +116,11 @@ export function getWinnerLabel(better, compareEnabled) {
     return "-";
 }
 
-export function applyScopeRows(rows, scope, lnScope) {
+export function applyScopeRows(rows, scope, lnScope, allScope) {
+    if (String(scope).toUpperCase() === String(allScope).toUpperCase()) {
+        return [...rows];
+    }
+
     if (String(scope).toUpperCase() === String(lnScope).toUpperCase()) {
         return rows.filter((row) => normalizePattern(row.pattern) === "ln");
     }
