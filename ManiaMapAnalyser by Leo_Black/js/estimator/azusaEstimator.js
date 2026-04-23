@@ -1006,6 +1006,7 @@ export function runAzusaEstimatorFromText(osuText, options = {}) {
 
     let danielNumeric = null;
     let sunnyNumeric = null;
+    let sunnyResult = precomputedSunnyResult;
 
     if (precomputedDanielResult) {
         danielNumeric = estimateDanielNumeric(precomputedDanielResult);
@@ -1018,17 +1019,18 @@ export function runAzusaEstimatorFromText(osuText, options = {}) {
         }
     }
 
-    if (precomputedSunnyResult) {
-        sunnyNumeric = estimateSunnyNumeric(precomputedSunnyResult);
+    if (sunnyResult) {
+        sunnyNumeric = estimateSunnyNumeric(sunnyResult);
     } else {
         try {
             const sunnyOptions = forceSunnyReferenceHo
                 ? { ...options, cvtFlag: "HO" }
                 : options;
-            const sunny = runSunnyEstimatorFromText(osuText, sunnyOptions);
-            sunnyNumeric = estimateSunnyNumeric(sunny);
+            sunnyResult = runSunnyEstimatorFromText(osuText, sunnyOptions);
+            sunnyNumeric = estimateSunnyNumeric(sunnyResult);
         } catch {
             sunnyNumeric = null;
+            sunnyResult = null;
         }
     }
 
@@ -1067,12 +1069,7 @@ export function runAzusaEstimatorFromText(osuText, options = {}) {
         estDiff,
         numericDifficulty: Number(finalNumeric.toFixed(2)),
         numericDifficultyHint: "azusa-rc-v1",
-        graph: withGraph
-            ? {
-                times: curve.times,
-                values: curve.local,
-            }
-            : null,
+        graph: withGraph ? (sunnyResult?.graph || null) : null,
         rawNumericDifficulty: Number(primaryNumeric.toFixed(4)),
         debug: {
             primaryNumeric: Number(primaryNumeric.toFixed(4)),
