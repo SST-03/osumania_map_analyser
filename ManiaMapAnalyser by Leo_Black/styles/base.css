@@ -60,7 +60,7 @@ body {
 }
 
 .main-card.hide-title-icon .title-icon {
-    display: none;
+    display: none !important;
 }
 
 .main-card {

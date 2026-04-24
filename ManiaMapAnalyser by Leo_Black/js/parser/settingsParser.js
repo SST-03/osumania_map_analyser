@@ -417,9 +417,14 @@ export function createSettingsParsers(appConfig) {
         return appConfig.defaults.cardRadius;
     }
 
-    function parseShowTitleIconValue(settingsPayload) {
-        const value = extractSettingValue(settingsPayload, "showTitleIcon");
-        return normalizeBooleanSetting(value, appConfig.defaults.showTitleIcon);
+    function parseEnableUpdateCheckValue(settingsPayload) {
+        const value = extractSettingValue(settingsPayload, "enableUpdateCheck");
+        if (value !== undefined) {
+            return normalizeBooleanSetting(value, appConfig.defaults.enableUpdateCheck);
+        }
+
+        const legacyValue = extractSettingValue(settingsPayload, "showTitleIcon");
+        return normalizeBooleanSetting(legacyValue, appConfig.defaults.enableUpdateCheck);
     }
 
     function parseReverseCardExtendDirectionValue(settingsPayload) {
@@ -470,7 +475,7 @@ export function createSettingsParsers(appConfig) {
         parseCardOpacityValue,
         parseCardBlurValue,
         parseCardRadiusValue,
-        parseShowTitleIconValue,
+        parseEnableUpdateCheckValue,
         parseReverseCardExtendDirectionValue,
         parseSvDetectionValue,
         parseWsEndpointValue,

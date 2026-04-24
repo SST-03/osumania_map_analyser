@@ -22,7 +22,7 @@ import {
     parseEnableNumericDifficultyValue,
     parseHideCardDuringPlayValue,
     parseShowModeTagCapsuleValue,
-    parseShowTitleIconValue,
+    parseEnableUpdateCheckValue,
     parseReverseCardExtendDirectionValue,
     parseSrTextValue,
     parseSvDetectionValue,
@@ -61,6 +61,7 @@ import {
 } from "./hud.js";
 import { resolveAutoDisplayProfile } from "./modeLogic.js";
 import { scheduleRecompute } from "./scheduler.js";
+import { runUpdateCheckIfDue, runUpdateCheckNow } from "./updateChecker.js";
 
 function isAutoDisplayEnabled() {
     return state.userSrText === "Auto" || state.userContentBar === "Auto";
@@ -182,13 +183,14 @@ function applyVisualStyleSettings() {
     const opacity = opacityMap[state.cardOpacity] || opacityMap[APP_CONFIG.defaults.cardOpacity] || "0.95";
     const blur = blurMap[state.cardBlur] || blurMap[APP_CONFIG.defaults.cardBlur] || "6px";
     const radius = radiusMap[state.cardRadius] || radiusMap[APP_CONFIG.defaults.cardRadius] || "16px";
+    const shouldShowUpdateIcon = Boolean(state.enableUpdateCheck && state.hasAvailableUpdate);
 
     if (mainCardEl) {
         mainCardEl.style.setProperty("--card-opacity", opacity);
         mainCardEl.style.setProperty("--card-backdrop-blur", blur);
         mainCardEl.style.setProperty("--card-radius", radius);
         mainCardEl.style.setProperty("--card-extend-origin", state.reverseCardExtendDirection ? "bottom" : "top");
-        mainCardEl.classList.toggle("hide-title-icon", !state.showTitleIcon);
+        mainCardEl.classList.toggle("hide-title-icon", !shouldShowUpdateIcon);
     }
 
     if (dashboardEl) {
@@ -196,9 +198,36 @@ function applyVisualStyleSettings() {
     }
 
     if (titleIconEl) {
-        titleIconEl.hidden = !state.showTitleIcon;
+        titleIconEl.hidden = !shouldShowUpdateIcon;
+        titleIconEl.style.display = shouldShowUpdateIcon ? "" : "none";
     }
 
+}
+
+function getCurrentAppVersion() {
+    if (typeof window !== "undefined" && typeof window.__MMA_VERSION === "string") {
+        return window.__MMA_VERSION;
+    }
+    return "0.0.0";
+}
+
+function applyAvailableUpdateState(hasUpdate) {
+    const next = Boolean(hasUpdate);
+    const changed = state.hasAvailableUpdate !== next;
+    state.hasAvailableUpdate = next;
+    applyVisualStyleSettings();
+    return changed;
+}
+
+function startUpdateCheckIfEnabled(force = false) {
+    const runner = force ? runUpdateCheckNow : runUpdateCheckIfDue;
+    runner({
+        enabled: state.enableUpdateCheck,
+        currentVersion: getCurrentAppVersion(),
+        onResult: ({ hasUpdate }) => {
+            applyAvailableUpdateState(hasUpdate);
+        },
+    });
 }
 
 export function getCounterPathForCommand() {
@@ -476,10 +505,19 @@ export function applyCardRadiusSetting(value) {
     return changed;
 }
 
-export function applyShowTitleIconSetting(value) {
-    const next = normalizeBooleanSetting(value, APP_CONFIG.defaults.showTitleIcon);
-    const changed = state.showTitleIcon !== next;
-    state.showTitleIcon = next;
+export function applyEnableUpdateCheckSetting(value) {
+    const next = normalizeBooleanSetting(value, APP_CONFIG.defaults.enableUpdateCheck);
+    const changed = state.enableUpdateCheck !== next;
+    const wasEnabled = state.enableUpdateCheck;
+    state.enableUpdateCheck = next;
+
+    if (!next) {
+        applyAvailableUpdateState(false);
+    } else {
+        const forceCheck = changed && !wasEnabled && next;
+        startUpdateCheckIfEnabled(forceCheck);
+    }
+
     applyVisualStyleSettings();
     return changed;
 }
@@ -536,7 +574,7 @@ export function setupSettingsCommandListener() {
         const cardOpacityChanged = applyCardOpacitySetting(parseCardOpacityValue(payload));
         const cardBlurChanged = applyCardBlurSetting(parseCardBlurValue(payload));
         const cardRadiusChanged = applyCardRadiusSetting(parseCardRadiusValue(payload));
-        const showTitleIconChanged = applyShowTitleIconSetting(parseShowTitleIconValue(payload));
+        const enableUpdateCheckChanged = applyEnableUpdateCheckSetting(parseEnableUpdateCheckValue(payload));
         const reverseCardDirectionChanged = applyReverseCardExtendDirectionSetting(parseReverseCardExtendDirectionValue(payload));
         const svChanged = applyDebugUseSvDetectionSetting(parseSvDetectionValue(payload));
 
@@ -565,7 +603,7 @@ export function setupSettingsCommandListener() {
             || cardOpacityChanged
             || cardBlurChanged
             || cardRadiusChanged
-            || showTitleIconChanged
+            || enableUpdateCheckChanged
             || reverseCardDirectionChanged
             || svChanged;
 
@@ -660,7 +698,7 @@ export async function loadSettings() {
         applyCardOpacitySetting(parseCardOpacityValue(settings));
         applyCardBlurSetting(parseCardBlurValue(settings));
         applyCardRadiusSetting(parseCardRadiusValue(settings));
-        applyShowTitleIconSetting(parseShowTitleIconValue(settings));
+        applyEnableUpdateCheckSetting(parseEnableUpdateCheckValue(settings));
         applyReverseCardExtendDirectionSetting(parseReverseCardExtendDirectionValue(settings));
         applyDebugUseSvDetectionSetting(parseSvDetectionValue(settings));
     } catch {
@@ -682,7 +720,7 @@ export async function loadSettings() {
         applyCardOpacitySetting(APP_CONFIG.defaults.cardOpacity);
         applyCardBlurSetting(APP_CONFIG.defaults.cardBlur);
         applyCardRadiusSetting(APP_CONFIG.defaults.cardRadius);
-        applyShowTitleIconSetting(APP_CONFIG.defaults.showTitleIcon);
+        applyEnableUpdateCheckSetting(APP_CONFIG.defaults.enableUpdateCheck);
         applyReverseCardExtendDirectionSetting(APP_CONFIG.defaults.reverseCardExtendDirection);
         applyDebugUseSvDetectionSetting(APP_CONFIG.defaults.svDetection);
     }

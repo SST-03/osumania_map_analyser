@@ -1,5 +1,11 @@
 ﻿import { initialize } from "./js/app/main.js";
 
+const _VERSION = "1.4.0";
+
+if (typeof window !== "undefined") {
+	window.__MMA_VERSION = _VERSION;
+}
+
 async function boot() {
 	try {
 		await initialize();

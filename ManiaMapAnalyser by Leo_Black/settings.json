@@ -130,14 +130,6 @@
 		"value": false
 	},
 	{
-		"uniqueID": "showTitleIcon",
-		"type": "checkbox",
-		"title": "Show Title Icon",
-		"description": "Show the icon at the left of metadata status line.",
-		"options": [],
-		"value": true
-	},
-	{
 		"uniqueID": "reverseCardExtendDirection",
 		"type": "checkbox",
 		"title": "Reverse Card Extension",
@@ -154,6 +146,14 @@
 		"description":"",
 		"options":[],
 		"value":""
+	},
+	{
+		"uniqueID": "enableUpdateCheck",
+		"type": "checkbox",
+		"title": "Enable Update Check",
+		"description": "Check latest GitHub release once per day. The star icon is shown only when a newer release is found.",
+		"options": [],
+		"value": true
 	},
 	{
 		"uniqueID": "enablePauseDetection",

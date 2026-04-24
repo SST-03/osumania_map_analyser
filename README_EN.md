@@ -75,12 +75,15 @@ Note: It is recommended to start with the default settings and then adjust accor
         - Strong: Strong blur.
     - **Card Radius**: Set card corner roundness.
         - Small / Medium / Large.
-    - **Show Title Icon**: Whether to show the icon on the left side of the status line.
     - **Reverse Card Extension**: Reverse card expansion direction.
         - When enabled, the card stays anchored at the bottom and grows upward; when disabled, it expands downward by default.
 - **Functional Settings**:
     - **Pause Detection**: Whether to enable pause detection.
         - Recommended: When enabled, pause positions will be displayed on the difficulty chart, and the number of pauses will be shown in the bottom right corner.
+    - **Enable Update Check**: Whether to enable update checking.
+        - When enabled, it checks GitHub latest release at most once per day by default.
+        - When switching from disabled to enabled, it immediately triggers one extra check.
+        - The star icon on the left side of the status line is shown only when a newer version is available.
     - **Vibro Detection**: Whether to enable vibro detection.
         - Recommended: When enabled, the plugin will detect if a beatmap is a vibro map and display it as "Vibro" in the estimated difficulty; otherwise, you will see an extremely inflated difficulty estimate.
     - **Estimator Algorithm**: Choose the algorithm used for difficulty estimation.

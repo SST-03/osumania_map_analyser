@@ -74,12 +74,15 @@
         - Strong: 强模糊效果。
     - **Card Radius**: 设置卡片圆角大小。
         - Small / Medium / Large。
-    - **Show Title Icon**: 是否显示状态栏左侧标题图标。
     - **Reverse Card Extension**: 是否反转卡片延展方向。
         - 启用后卡片底边保持锚定，扩展时向上生长；关闭时默认向下扩展。
 - **功能性设置**：
     - **Pause Detection**: 是否启用暂停检测功能。
         - 推荐启用：启用后将在难度图表上显示暂停位置，并在卡片右下角显示暂停次数。
+    - **Enable Update Check**: 是否启用版本更新检查。
+        - 启用后默认每天最多检查一次 GitHub latest release。
+        - 当从“关闭”切换到“开启”时，会立即额外触发一次检查。
+        - 当发现新版本时，状态栏左侧星形图标会显示。
     - **Vibro Detection**: 是否启用Vibro检测功能。
         - 推荐启用：启用后将检测谱面是否为Vibro谱面，并在估计难度中显示为Vibro。否则您将看到被极度拉高的难度估计。
     - **Estimator Algorithm**: 选择用于难度估计的算法。

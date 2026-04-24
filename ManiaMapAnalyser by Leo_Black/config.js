@@ -91,7 +91,7 @@ export const APP_CONFIG = {
         cardOpacity: "95%",
         cardBlur: "Soft",
         cardRadius: "Medium",
-        showTitleIcon: true,
+        enableUpdateCheck: true,
         reverseCardExtendDirection: false,
         contentBar: "Auto",
         srText: "Auto",
