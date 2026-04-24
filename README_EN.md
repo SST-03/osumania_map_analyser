@@ -1,5 +1,5 @@
 # osumania_map_analyser
-**[English](README_EN.md) | 中文**
+**English | [中文](README.md)**
 
 > **Translation Note**: This document was translated from Chinese to English with the assistance of an AI language model. While efforts have been made to ensure accuracy, please refer to the original Chinese version if any ambiguity arises.
 ****
