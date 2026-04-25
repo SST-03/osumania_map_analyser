@@ -327,9 +327,16 @@ function numericToRcLabel(numeric) {
 }
 
 function estimateDanielNumeric(result) {
-    const numeric = Number(result?.numericDifficulty);
-    if (Number.isFinite(numeric)) {
-        return numeric;
+    const numericRaw = result?.numericDifficulty;
+    if (typeof numericRaw === "number" && Number.isFinite(numericRaw)) {
+        return numericRaw;
+    }
+
+    if (typeof numericRaw === "string" && numericRaw.trim().length > 0) {
+        const parsed = Number(numericRaw);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
     }
 
     const star = Number(result?.star);
