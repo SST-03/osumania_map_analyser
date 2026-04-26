@@ -980,6 +980,7 @@ function computePostOutputCurveGapResidualCorrection(baseNumeric, blendDetails, 
 }
 
 export function runAzusaEstimatorFromText(osuText, options = {}) {
+    const speedRate = Number.isFinite(options.speedRate) && options.speedRate > 0 ? Number(options.speedRate) : 1.0;
     const withGraph = options.withGraph === true;
     const forceSunnyReferenceHo = options.forceSunnyReferenceHo !== false;
     const precomputedDanielResult = options.precomputedDanielResult || null;
@@ -1013,9 +1014,17 @@ export function runAzusaEstimatorFromText(osuText, options = {}) {
         );
     }
 
-    annotateRows(taps, AZUSA_CONFIG.rowToleranceMs);
+    const timeScale = speedRate !== 0 ? (1 / speedRate) : 1;
+    const scaledTaps = timeScale === 1
+        ? taps
+        : taps.map((note) => ({
+            ...note,
+            t: note.t * timeScale,
+        }));
 
-    const curve = buildDifficultyCurve(taps);
+    annotateRows(scaledTaps, AZUSA_CONFIG.rowToleranceMs * timeScale);
+
+    const curve = buildDifficultyCurve(scaledTaps);
     const primaryNumeric = computeAzusaNumericFromCurve(curve, taps.length);
 
     const maxColumn = Math.max(...curve.columnCounts);
@@ -1069,7 +1078,12 @@ export function runAzusaEstimatorFromText(osuText, options = {}) {
         );
 
         if (highSignal < 14) {
-            danielNumericForBlend = 0;
+            const speedDelta = speedRate - 1.0;
+            const fallbackScale = speedDelta < 0
+                ? clamp((-speedDelta) * 0.43, 0, 1)
+                : clamp(speedDelta * 0.35, 0, 1);
+
+            danielNumericForBlend = danielNumeric * fallbackScale;
         }
     }
 
