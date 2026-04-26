@@ -26,6 +26,8 @@ import {
 } from "./graph.js";
 import { updateCardPlayVisibility } from "./hud.js";
 import { scheduleRecompute } from "./scheduler.js";
+import { getCounterPathForCommand } from "./settings.js";
+
 
 function getModData(data) {
     return getModDataFromPayload(data, {
@@ -239,6 +241,8 @@ export function setupSocketListener() {
         const key = `${nextBeatmapIdentity}|${nextModSignature}`;
         resetPauseRuntime(true);
         state.lastBeatmapKey = key;
+
+        socket.sendCommand("getSettings", getCounterPathForCommand());
 
         scheduleRecompute("beatmap/mod changed", true);
     });
