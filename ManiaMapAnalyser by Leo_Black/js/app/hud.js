@@ -230,7 +230,8 @@ export function updateCardPlayVisibility() {
         return;
     }
 
-    const shouldHide = state.hideCardDuringPlay && state.clientStateName === "play";
+    const shouldHide = (state.hideCardDuringPlay && state.clientStateName === "play") 
+                       || (state.clientStateName === "menu");
     mainCardEl.classList.toggle("card-hidden-by-play", shouldHide);
     mainCardEl.setAttribute("aria-hidden", shouldHide ? "true" : "false");
 }
