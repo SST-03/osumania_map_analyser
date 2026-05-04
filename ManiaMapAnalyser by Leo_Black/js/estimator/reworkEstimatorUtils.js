@@ -1,11 +1,23 @@
 import { DAN_INDEX } from "./intervals/index.js";
 
+const DAN_MEANS = [
+    [6.562, "Alpha"],
+    [6.957, "Beta"],
+    [7.459, "Gamma"],
+    [7.939, "Delta"],
+    [9.095, "Epsilon"],
+    [9.473, "Emik Zeta"],
+    [10.162, "Thaumiel Eta"],
+    [10.782, "CloverWisp Theta"],
+];
+
+const DAN_ORDER_START = 11;
 
 function precomputeDanBoundaries() {
-    const means = DAN_ORDER.map((name) => DAN_MEANS[name]);
+    const means = DAN_MEANS.map(([mean]) => mean);
     const boundaries = [];
 
-    for (let i = 0; i < DAN_ORDER.length; i += 1) {
+    for (let i = 0; i < DAN_MEANS.length; i += 1) {
         const mean = means[i];
         const lower = i > 0
             ? (means[i - 1] + mean) / 2
@@ -19,21 +31,9 @@ function precomputeDanBoundaries() {
     return boundaries;
 }
 
-export function estimateDanielDan(sr) {
-    const DAN_MEANS = {
-        Alpha: 6.562,
-        Beta: 6.957,
-        Gamma: 7.459,
-        Delta: 7.939,
-        Epsilon: 9.095,
-        Zeta: 9.473,
-        Eta: 10.162,
-        Theta: 10.782,
-    };
-    const DAN_BOUNDARIES = precomputeDanBoundaries();
+const DAN_BOUNDARIES = precomputeDanBoundaries();
 
-    const DAN_ORDER = Object.keys(DAN_MEANS);
-    const DAN_ORDER_START = 11;
+export function estimateDanielDan(sr) {
     if (!Number.isFinite(sr)) {
         return {
             label: "Unknown",
@@ -43,19 +43,19 @@ export function estimateDanielDan(sr) {
 
     if (sr < DAN_BOUNDARIES[0][0]) {
         return {
-            label: `< ${DAN_ORDER[0]} Low`,
+            label: `< ${DAN_MEANS[0][1]} Low`,
             numeric: null,
         };
     }
 
     if (sr >= DAN_BOUNDARIES[DAN_BOUNDARIES.length - 1][1]) {
         return {
-            label: `> ${DAN_ORDER[DAN_ORDER.length - 1]} High`,
+            label: `> ${DAN_MEANS[DAN_MEANS.length - 1][1]} High`,
             numeric: null,
         };
     }
 
-    for (let i = 0; i < DAN_ORDER.length; i += 1) {
+    for (let i = 0; i < DAN_MEANS.length; i += 1) {
         const [lower, upper] = DAN_BOUNDARIES[i];
         if (sr >= lower && sr < upper) {
             const tRaw = (sr - lower) / (upper - lower);
@@ -64,25 +64,11 @@ export function estimateDanielDan(sr) {
 
             let label;
             if (t < 1 / 3) {
-                label = `${DAN_ORDER[i]} Low`;
+                label = `${DAN_MEANS[i][1]} Low`;
             } else if (t < 2 / 3) {
-                label = `${DAN_ORDER[i]} Mid`;
+                label = `${DAN_MEANS[i][1]} Mid`;
             } else {
-                label = `${DAN_ORDER[i]} High`;
-            }
-            
-            switch (i){
-                case 5:
-                    label = `Emik ${label}`;
-                    break;
-                case 6:
-                    label = `Thaumiel ${label}`;
-                    break;
-                case 7:
-                    label = `CloverWisp ${label}`;
-                    break;
-                default:
-                    break;
+                label = `${DAN_MEANS[i][1]} High`;
             }
 
             return {
