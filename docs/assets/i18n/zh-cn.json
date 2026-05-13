@@ -17,7 +17,7 @@
     "band": {
       "exact": "精确",
       "close": "接近",
-      "moderate": "中等",
+      "moderate": "一般",
       "miss": "误判"
     },
     "status": {

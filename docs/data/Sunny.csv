@@ -7,7 +7,7 @@ bid,name,pattern,subPattern,expected,got,delta,deltaAbs
 ,Intersect Thunderbolt-Remix,speed,mid stream,17.2,16.40,0.80,0.80
 ,Torment Payback,jack,high chordjack,17.2,17.20,0.00,0.00
 ,Collapse of Ego,stamina,dense jumpstream,16.8,16.60,0.20,0.20
-,Angel Dust (2016 Radio Mix)(zeta),jack,anchor chordjack,16.6,15.40,1.20,1.20
+,Angel Dust (2016 Radio Mix)(zeta),jack,anchor chordjack,15.6,15.40,0.20,0.20
 ,northern limit(haku) x1.1,tech,stream tech,16.4,15.80,0.60,0.60
 ,Purgatorium(efv2) x1.14,tech,stream tech,16.4,16.20,0.20,0.20
 ,Angel Dust(spz),stamina,light handstream,16.4,16.60,-0.20,0.20
@@ -103,7 +103,7 @@ bid,name,pattern,subPattern,expected,got,delta,deltaAbs
 ,Akasha(sp3v2) x0.88,speed,Unsigned,11.7,9.60,2.10,2.10
 ,End Time(e3v2) x1.1,speed,Unsigned,11.5,10.00,1.50,1.50
 ,INTERNET OVERDOSE x1.05,tech,stream tech,11.4,11.60,-0.20,0.20
-,Enthanasia x1.05,speed,Unsigned,11.2,10.20,1.00,1.00
+,Euthanasia x1.05,speed,Unsigned,11.2,10.20,1.00,1.00
 ,LazorBeamz,stamina,light jumpstream,11,10.00,1.00,1.00
 ,Makiba(alpha),speed,low stream,11,10.40,0.60,0.60
 ,Dark Sambaland,jack,high chordjack,11,10.40,0.60,0.60
