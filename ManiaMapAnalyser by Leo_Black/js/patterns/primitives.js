@@ -155,17 +155,35 @@ export function svTime(chart) {
     let total = 0;
     let time = chart.FirstNote;
     let vel = 1;
+    let nonOneIntervals = 0;
+    let inNonOne = false;
 
     for (const sv of chart.SV) {
-    if (!Number.isFinite(vel) || Math.abs(vel - 1) > PATTERNS_CONFIG.SV_SPEED_EPS) {
+        const curVel = Number(sv.Data);
+        const curNonOne = !Number.isFinite(curVel) || Math.abs(curVel - 1) > PATTERNS_CONFIG.SV_SPEED_EPS;
+
+        if (!Number.isFinite(vel) || Math.abs(vel - 1) > PATTERNS_CONFIG.SV_SPEED_EPS) {
             total += (sv.Time - time);
-    }
-    vel = sv.Data;
-    time = sv.Time;
+        }
+
+        if (curNonOne && !inNonOne) {
+            nonOneIntervals += 1;
+            inNonOne = true;
+        } else if (!curNonOne) {
+            inNonOne = false;
+        }
+
+        vel = curVel;
+        time = sv.Time;
     }
 
     if (!Number.isFinite(vel) || Math.abs(vel - 1) > PATTERNS_CONFIG.SV_SPEED_EPS) {
     total += (chart.LastNote - time);
+    }
+
+    // A single non-1.0 interval (constant scroll speed or BPM artifact) is not SV
+    if (nonOneIntervals <= 1) {
+        return 0;
     }
 
     let extreme = false;

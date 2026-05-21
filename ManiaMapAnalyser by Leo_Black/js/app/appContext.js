@@ -71,7 +71,7 @@ export const state = {
     userSrText: APP_CONFIG.defaults.srText,
     userDiffText: APP_CONFIG.defaults.diffText,
     debugUseAmount: APP_CONFIG.defaults.debugUseAmount,
-    debugUseSvDetection: APP_CONFIG.defaults.svDetection,
+    useSvDetection: APP_CONFIG.defaults.useSvDetection,
     diffText: APP_CONFIG.defaults.diffText,
     estimatorAlgorithm: APP_CONFIG.defaults.estimatorAlgorithm,
     actualEstimatorAlgorithm: APP_CONFIG.defaults.estimatorAlgorithm,

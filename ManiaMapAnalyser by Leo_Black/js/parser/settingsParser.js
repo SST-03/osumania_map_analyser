@@ -450,8 +450,8 @@ export function createSettingsParsers(appConfig) {
     }
 
     function parseSvDetectionValue(settingsPayload) {
-        const value = extractSettingValue(settingsPayload, "debugUseSvDetection");
-        return normalizeBooleanSetting(value, appConfig.defaults.svDetection);
+        const value = extractSettingValue(settingsPayload, "useSvDetection");
+        return normalizeBooleanSetting(value, appConfig.defaults.useSvDetection);
     }
 
     function parseWsEndpointValue(settingsPayload) {

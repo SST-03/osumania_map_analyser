@@ -246,10 +246,10 @@ export function applyDebugUseAmountSetting(value) {
     return changed;
 }
 
-export function applyDebugUseSvDetectionSetting(value) {
-    const next = normalizeBooleanSetting(value, APP_CONFIG.defaults.svDetection);
-    const changed = state.debugUseSvDetection !== next;
-    state.debugUseSvDetection = next;
+export function applyUseSvDetectionSetting(value) {
+    const next = normalizeBooleanSetting(value, APP_CONFIG.defaults.useSvDetection);
+    const changed = state.useSvDetection !== next;
+    state.useSvDetection = next;
     return changed;
 }
 
@@ -596,7 +596,7 @@ export function setupSettingsCommandListener() {
         const cardRadiusChanged = applyCardRadiusSetting(parseCardRadiusValue(payload));
         const enableUpdateCheckChanged = applyEnableUpdateCheckSetting(parseEnableUpdateCheckValue(payload));
         const reverseCardDirectionChanged = applyReverseCardExtendDirectionSetting(parseReverseCardExtendDirectionValue(payload));
-        const svChanged = applyDebugUseSvDetectionSetting(parseSvDetectionValue(payload));
+        const svChanged = applyUseSvDetectionSetting(parseSvDetectionValue(payload));
 
         const legacyAutoMode = parseAutoModeValue(payload);
         if (legacyAutoMode && !isAutoDisplayEnabled()) {
@@ -726,7 +726,7 @@ export async function loadSettings() {
         applyCardRadiusSetting(parseCardRadiusValue(settings));
         applyEnableUpdateCheckSetting(parseEnableUpdateCheckValue(settings));
         applyReverseCardExtendDirectionSetting(parseReverseCardExtendDirectionValue(settings));
-        applyDebugUseSvDetectionSetting(parseSvDetectionValue(settings));
+        applyUseSvDetectionSetting(parseSvDetectionValue(settings));
     } catch {
         applyWsEndpointSetting(APP_CONFIG.defaults.wsEndpoint || APP_CONFIG.socketHost);
         applyContentBarSetting(APP_CONFIG.defaults.contentBar);
@@ -750,7 +750,7 @@ export async function loadSettings() {
         applyCardRadiusSetting(APP_CONFIG.defaults.cardRadius);
         applyEnableUpdateCheckSetting(APP_CONFIG.defaults.enableUpdateCheck);
         applyReverseCardExtendDirectionSetting(APP_CONFIG.defaults.reverseCardExtendDirection);
-        applyDebugUseSvDetectionSetting(APP_CONFIG.defaults.svDetection);
+        applyUseSvDetectionSetting(APP_CONFIG.defaults.useSvDetection);
     }
 }
 

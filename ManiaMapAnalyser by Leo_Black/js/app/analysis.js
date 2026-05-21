@@ -319,7 +319,7 @@ export async function fetchBeatmapFile(reason) {
         const needPatternAnalysis = activeContentBar === "Pattern"
             || state.srText === "Pattern"
             || state.diffText === "Pattern"
-            || state.debugUseSvDetection
+            || state.useSvDetection
             || needVibroDetection
             || autoDisplayEnabled;
         const needMsdValue = state.srText === "MSD" || state.diffText === "MSD";
@@ -576,7 +576,7 @@ export async function fetchBeatmapFile(reason) {
             : (patternResult?.report?.ModeTag || fallbackModeTag);
         let shouldShowSvTag = false;
 
-        if (state.debugUseSvDetection) {
+        if (state.useSvDetection) {
             const svAmount = Number(patternReport?.SVAmount);
             if (Number.isFinite(svAmount) && svAmount >= PATTERNS_CONFIG.SV_AMOUNT_THRESHOLD) {
                 shouldShowSvTag = true;
@@ -609,7 +609,7 @@ export async function fetchBeatmapFile(reason) {
                 activeContentBar === "Pattern"
                 || state.srText === "Pattern"
                 || state.diffText === "Pattern"
-                || state.debugUseSvDetection
+                || state.useSvDetection
             ) && !needPatternAnalysis;
 
             if (profileChanged && ((missingEtterna || missingPattern)

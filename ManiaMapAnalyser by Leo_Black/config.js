@@ -88,7 +88,7 @@ export const APP_CONFIG = {
         enableStatusMarquee: true,
         vibroDetection: true,
         disableVibroDetection: false,
-        svDetection: false,
+        useSvDetection: true,
         showModeTagCapsule: true,
         enableNumericDifficulty: true,
         hideCardDuringPlay: false,

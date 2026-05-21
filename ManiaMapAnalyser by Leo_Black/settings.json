@@ -1,43 +1,43 @@
 [
 	{
-		"uniqueID":"hLinks",
-		"type":"header",
-		"title":"Links",
-		"description":"",
-		"options":[],
-		"value":""
+		"uniqueID": "hLinks",
+		"type": "header",
+		"title": "Links",
+		"description": "",
+		"options": [],
+		"value": ""
 	},
 	{
-		"uniqueID":"GuideButton",
-		"type":"button",
-		"title":"Settings Guide",
-		"description":"Go to the repo's readme.md file for settings usage instructions and more information.",
-		"options":[],
-		"value":"https://github.com/LeoBlackMT/osumania_map_analyser/blob/main/README_EN.md#settings"
+		"uniqueID": "GuideButton",
+		"type": "button",
+		"title": "Settings Guide",
+		"description": "Go to the repo's readme.md file for settings usage instructions and more information.",
+		"options": [],
+		"value": "https://github.com/LeoBlackMT/osumania_map_analyser/blob/main/README_EN.md#settings"
 	},
 	{
-		"uniqueID":"IssueButton",
-		"type":"button",
-		"title":"Report Issue",
-		"description":"Report any bugs or suggest features on the GitHub.",
-		"options":[],
-		"value":"https://github.com/LeoBlackMT/osumania_map_analyser/issues/new"
+		"uniqueID": "IssueButton",
+		"type": "button",
+		"title": "Report Issue",
+		"description": "Report any bugs or suggest features on the GitHub.",
+		"options": [],
+		"value": "https://github.com/LeoBlackMT/osumania_map_analyser/issues/new"
 	},
 	{
-		"uniqueID":"BenchmarkButton",
-		"type":"button",
-		"title":"Benchmark Results",
-		"description":"View estimator algorithm's benchmark results and performance data.",
-		"options":[],
-		"value":"https://leoblackmt.github.io/osumania_map_analyser"
+		"uniqueID": "BenchmarkButton",
+		"type": "button",
+		"title": "Benchmark Results",
+		"description": "View estimator algorithm's benchmark results and performance data.",
+		"options": [],
+		"value": "https://leoblackmt.github.io/osumania_map_analyser"
 	},
 	{
-		"uniqueID":"hVisual",
-		"type":"header",
-		"title":"Visual Customization",
-		"description":"",
-		"options":[],
-		"value":""
+		"uniqueID": "hVisual",
+		"type": "header",
+		"title": "Visual Customization",
+		"description": "",
+		"options": [],
+		"value": ""
 	},
 	{
 		"uniqueID": "contentBar",
@@ -169,15 +169,13 @@
 		"options": [],
 		"value": false
 	},
-
-
 	{
-		"uniqueID":"hFunctions",
-		"type":"header",
-		"title":"Functionality Options",
-		"description":"",
-		"options":[],
-		"value":""
+		"uniqueID": "hFunctions",
+		"type": "header",
+		"title": "Functionality Options",
+		"description": "",
+		"options": [],
+		"value": ""
 	},
 	{
 		"uniqueID": "enableUpdateCheck",
@@ -200,6 +198,14 @@
 		"type": "checkbox",
 		"title": "Vibro Detection",
 		"description": "Recommended: Detect vibro maps and apply vibro fallback handling when needed.",
+		"options": [],
+		"value": true
+	},
+	{
+		"uniqueID": "useSvDetection",
+		"type": "checkbox",
+		"title": "SV Detection",
+		"description": "Enable SV-based mode tag/category detection. When enabled, maps with significant speed changes will be tagged as SV.",
 		"options": [],
 		"value": true
 	},
@@ -245,31 +251,29 @@
 		],
 		"value": "0.74.0"
 	},
-
 	{
-		"uniqueID":"hNetwork",
-		"type":"header",
-		"title":"Network Configuration",
-		"description":"",
-		"options":[],
-		"value":""
+		"uniqueID": "hNetwork",
+		"type": "header",
+		"title": "Network Configuration",
+		"description": "",
+		"options": [],
+		"value": ""
 	},
 	{
-		"uniqueID":"wsEndpoint",
-		"type":"text",
-		"title":"WebSocket Endpoint",
-		"description":"Set host:port for both websocket and beatmap HTTP endpoint.",
-		"options":[],
-		"value":"localhost:24050"
+		"uniqueID": "wsEndpoint",
+		"type": "text",
+		"title": "WebSocket Endpoint",
+		"description": "Set host:port for both websocket and beatmap HTTP endpoint.",
+		"options": [],
+		"value": "localhost:24050"
 	},
-
 	{
-		"uniqueID":"hDebug",
-		"type":"header",
-		"title":"Debug Options",
-		"description":"",
-		"options":[],
-		"value":""
+		"uniqueID": "hDebug",
+		"type": "header",
+		"title": "Debug Options",
+		"description": "",
+		"options": [],
+		"value": ""
 	},
 	{
 		"uniqueID": "debugUseAmount",
@@ -280,14 +284,6 @@
 		"value": false
 	},
 	{
-		"uniqueID": "debugUseSvDetection",
-		"type": "checkbox",
-		"title": "SV Detection(experimental)",
-		"description": "Allow SV-based mode tag/category detection logic.",
-		"options": [],
-		"value": false
-	},
-		{
 		"uniqueID": "azusaSunnyReferenceHo",
 		"type": "checkbox",
 		"title": "Azusa Sunny Reference Force HO",

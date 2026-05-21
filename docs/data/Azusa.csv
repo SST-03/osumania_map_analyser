@@ -612,3 +612,19 @@ bid,name,pattern,subPattern,expected,got,delta,deltaAbs
 5167720,Bismuth[Nebula](eclipse),tech,stream tech,11.4,11.84,-0.44,0.44
 3444323,Nostos2021(xingren),tech,stream tech,17,17.05,-0.05,0.05
 4130341,Re Aoharu(11bit),tech,stream tech,13.2,13.60,-0.40,0.40
+,Various Artists - Dan ~ REFORM ~ 1st Pack (Thaumiel) [~ 1st ~ (Marathon)],course,rc course,1,1.39,-0.39,0.39
+,Various Artists - Dan ~ REFORM ~ 1st Pack (Thaumiel) [~ 2nd ~ (Marathon)],course,rc course,2,2.00,0.00,0.00
+,Various Artists - Dan ~ REFORM ~ 1st Pack (Thaumiel) [~ 3rd ~ (Marathon)],course,rc course,3,1.97,1.03,1.03
+,Various Artists - Dan ~ REFORM ~ 1st Pack (Thaumiel) [~ 4th ~ (Marathon)],course,rc course,4,4.00,0.00,0.00
+,Various Artists - Dan ~ REFORM ~ 1st Pack (Thaumiel) [~ 5th ~ (Marathon)],course,rc course,5,5.64,-0.64,0.64
+,Various Artists - Dan ~ REFORM ~ 2nd Pack (Thaumiel) [~ 6th ~ (Marathon)],course,rc course,6,6.54,-0.54,0.54
+,Various Artists - Dan ~ REFORM ~ 2nd Pack (Thaumiel) [~ 7th ~ (Marathon)],course,rc course,7,7.12,-0.12,0.12
+,Various Artists - Dan ~ REFORM ~ 2nd Pack (Thaumiel) [~ 8th ~ (Marathon)],course,rc course,8,9.24,-1.24,1.24
+,Various Artists - Dan ~ REFORM ~ 2nd Pack (Thaumiel) [~ 9th ~ (Marathon)],course,rc course,9,9.54,-0.54,0.54
+,Various Artists - Dan ~ REFORM ~ 2nd Pack (Thaumiel) [~ 10th ~ (Marathon)],course,rc course,10,11.23,-1.23,1.23
+,Various Artists - Dan ~ REFORM ~ 2nd Pack (Thaumiel) [~ EXTRA-ALPHA ~ (Marathon)],course,rc course,11,11.86,-0.86,0.86
+,Various Artists - Dan ~ REFORM ~ 2nd Pack (Thaumiel) [~ EXTRA-BETA ~ (Marathon)],course,rc course,12,12.57,-0.57,0.57
+,Various Artists - Dan ~ REFORM ~ 2nd Pack (Thaumiel) [~ EXTRA-GAMMA ~ (Marathon)],course,rc course,13,13.75,-0.75,0.75
+,Various Artists - Dan ~ REFORM ~ 2nd Pack (Thaumiel) [~ EXTRA-DELTA ~ (Marathon)],course,rc course,14,14.54,-0.54,0.54
+,Various Artists - Dan ~ REFORM ~ 2nd Pack (Thaumiel) [~ EXTRA-EPSILON ~ (Marathon)],course,rc course,15,15.98,-0.98,0.98
+,Various Artists - Dan ~ REFORM ~ FINAL ([GB]Thaumiel) [~ FINAL - ETA ~ ( Marathon )],course,rc course,17,17.12,-0.12,0.12
