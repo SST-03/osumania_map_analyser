@@ -120,7 +120,6 @@ Note: It is recommended to start with the default settings and then adjust accor
         - It is enabled by default; please do not disable it casually. 
     - **Pause Detection Threshold**: Set the minimum duration (ms) for a time freeze to be counted as a pause.
         - A pause is only confirmed when the game time has been frozen for longer than this threshold.
-        - Available values: 200 / 500 / 1000 / 1500 / 2000 ms.
         - Default is 500ms. If game lag causes false positives, increase this value.
 
 ## References
@@ -130,3 +129,7 @@ Note: It is recommended to start with the default settings and then adjust accor
 - [Interlude](https://github.com/YAVSRG/YAVSRG): Interlude's RC pattern analysis algorithm is used, with new LN detection added.
 - [Daniel](https://thebagelofman.github.io/Daniel/): Daniel's algorithm is used for difficulty estimation.
 - [Companella](https://github.com/Leinadix/companella): Companella's algorithm is used for difficulty estimation.
+
+## Special Thanks
+- [inuiyumegan](https://github.com/inuiyumegan): Provided a large amount of beatmap data for algorithm debugging and benchmarking.
+- [greycsont](https://github.com/greycsont): Contributed several features.

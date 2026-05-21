@@ -67,7 +67,7 @@ import {
     setEffectiveContentBarForMap,
 } from "./settings.js";
 import { scheduleRecompute } from "./scheduler.js";
-import { detectVibro } from "./vibro.js";
+import { detectVibro, detectVibroFromLongjackPattern } from "./vibro.js";
 
 function parseMetadataFromBeatmap(osuText) {
     const parser = new OsuFileParser(osuText);
@@ -315,16 +315,17 @@ export async function fetchBeatmapFile(reason) {
         const estimatorNeedsCompanellaData = estimatorAlgorithm === "Companella"
             || estimatorAlgorithm === "Mixed";
 
+        const needVibroDetection = state.vibroDetection;
         const needPatternAnalysis = activeContentBar === "Pattern"
             || state.srText === "Pattern"
             || state.diffText === "Pattern"
             || state.debugUseSvDetection
+            || needVibroDetection
             || autoDisplayEnabled;
         const needMsdValue = state.srText === "MSD" || state.diffText === "MSD";
         const needInterludeValue = state.srText === "InterludeSR"
             || state.diffText === "InterludeSR"
             || estimatorNeedsCompanellaData;
-        const needVibroDetection = state.vibroDetection;
         const needEtternaAnalysis = activeContentBar === "Etterna"
             || needMsdValue
             || needVibroDetection
@@ -480,7 +481,10 @@ export async function fetchBeatmapFile(reason) {
                 const vibroEligible = Number.isFinite(reworkStarValue) && reworkStarValue > 5.0;
                 isVibroMap = state.vibroDetection
                     && vibroEligible
-                    && detectVibro(ettResult?.values, VIBRO_JACKSPEED_RATIO_THRESHOLD);
+                    && (
+                        detectVibro(ettResult?.values, VIBRO_JACKSPEED_RATIO_THRESHOLD)
+                        || detectVibroFromLongjackPattern(patternReport, PATTERNS_CONFIG.LONGJACK_VIBRO_RATIO_THRESHOLD)
+                    );
 
                 if (activeContentBar === "Etterna") {
                     if (!(await waitForBodyRenderReady())) return;

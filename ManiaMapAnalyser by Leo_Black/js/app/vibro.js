@@ -23,3 +23,22 @@ export function detectVibro(values, threshold) {
 
     return (jackSpeed / overall) >= threshold;
 }
+
+export function detectVibroFromLongjackPattern(patternReport, threshold) {
+    if (!patternReport || !Array.isArray(patternReport.Clusters)) {
+        return false;
+    }
+
+    for (const cluster of patternReport.Clusters) {
+        if (!Array.isArray(cluster.SpecificTypes)) {
+            continue;
+        }
+        for (const [name, ratio] of cluster.SpecificTypes) {
+            if (name === "Longjacks" && Number.isFinite(ratio) && ratio >= threshold) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}

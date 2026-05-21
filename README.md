@@ -119,7 +119,6 @@
         - 默认启用，请不要随意关闭。
     - **Pause Detection Threshold**: 设置暂停检测的时间阈值（毫秒）。
         - 只有当游戏时间冻结超过该时长后，才会被判定为一次暂停。
-        - 可选值：200 / 500 / 1000 / 1500 / 2000 ms。
         - 默认值为500ms。如果游戏卡顿导致误判，可适当提高该值。
 
 ## 参考内容
@@ -129,3 +128,7 @@
 - [Interlude](https://github.com/YAVSRG/YAVSRG): 使用了Interlude的RC键型分析算法并在基础上新增LN检测算法。
 - [Daniel](https://thebagelofman.github.io/Daniel/): 使用了Daniel的算法进行难度估计。
 - [Companella](https://github.com/Leinadix/companella): 使用了Companella的算法进行难度估计。
+
+## 特别感谢
+- [inuiyumegan](https://github.com/inuiyumegan): 提供了大量谱面数据用于算法调试和Benchmark。
+- [greycsont](https://github.com/greycsont): 提供了部分功能。
