@@ -62,17 +62,14 @@ export function computePauseTransition({
     } else if (sameTime && !atEnd && !beforeStart) {
         if (!nextPaused) {
             if (!freezeStart) {
-                // 首次检测到时间冻结，记录开始时刻
                 nextFreezeStartRealMs = nowReal || freezeStart;
                 nextFreezeSongTimeMs = now;
             } else if (nowReal && freezeStart && (nowReal - freezeStart) >= pauseThreshold) {
-                // 持续时间超过阈值，确认暂停
                 nextPaused = true;
                 shouldAddMarker = true;
                 frozenInterpMs = freezeSong;
                 pauseTimeMs = freezeSong;
             }
-            // 持续时间未超过阈值时，保持等待状态
         }
     } else if (nextPaused) {
         nextPaused = false;

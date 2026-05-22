@@ -103,6 +103,9 @@
                 <button id="reloadDataButton" class="btn-ghost" type="button" data-i18n="index.actions.reloadData">Reload Data</button>
                 <button id="openDataFolderButton" class="btn-ghost" type="button" data-i18n="index.actions.uploadDataFolder">Upload Data Folder</button>
                 <button id="downloadCurrentDataButton" class="btn-ghost" type="button" data-i18n="index.actions.downloadCurrentData">Download Current Data</button>
+                <a href="https://github.com/LeoBlackMT/osumania_map_analyser/tree/main/docs/data/files.7z" target="_blank" rel="noopener noreferrer">
+                    <button id="downloadDatasetButton" class="btn-ghost" type="button" data-i18n="index.actions.downloadDataset">Download Dataset</button>
+                </a>
                 <input id="dataFileInput" type="file" accept=".csv" multiple directory webkitdirectory hidden />
                 <span id="sourceHint" class="muted source-hint" data-i18n="index.meta.sourceDefault">Source: Docs/Data</span>
             </div>
@@ -314,6 +317,20 @@
                             <option value="moderate" data-i18n="band.moderate">Moderate</option>
                             <option value="miss" data-i18n="band.miss">Miss</option>
                         </select>
+                    </label>
+                    <label class="range-label">
+                        <span data-i18n="index.filters.expected">Expected</span>
+                        <input id="expectedMinFilter" type="number" step="0.5" min="0" max="20" data-i18n-placeholder="index.filters.expectedMinPlaceholder" />
+                    </label>
+                    <label class="range-label">
+                        <input id="expectedMaxFilter" type="number" step="0.5" min="0" max="20" data-i18n-placeholder="index.filters.expectedMaxPlaceholder" />
+                    </label>
+                    <label class="range-label">
+                        <span data-i18n="index.filters.delta">|Delta|</span>
+                        <input id="deltaMinFilter" type="number" step="0.1" min="0" max="10" data-i18n-placeholder="index.filters.deltaMinPlaceholder" />
+                    </label>
+                    <label class="range-label">
+                        <input id="deltaMaxFilter" type="number" step="0.1" min="0" max="10" data-i18n-placeholder="index.filters.deltaMaxPlaceholder" />
                     </label>
                     <button id="clearFilterButton" class="btn-ghost" type="button" data-i18n="index.filters.clear">Clear Filters</button>
                 </div>

@@ -98,6 +98,10 @@ export const dom = {
     patternFilter: document.getElementById("patternFilter"),
     subPatternFilter: document.getElementById("subPatternFilter"),
     bandFilter: document.getElementById("bandFilter"),
+    expectedMinFilter: document.getElementById("expectedMinFilter"),
+    expectedMaxFilter: document.getElementById("expectedMaxFilter"),
+    deltaMinFilter: document.getElementById("deltaMinFilter"),
+    deltaMaxFilter: document.getElementById("deltaMaxFilter"),
     clearFilterButton: document.getElementById("clearFilterButton"),
 
     tableMeta: document.getElementById("tableMeta"),

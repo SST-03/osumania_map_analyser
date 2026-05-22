@@ -210,7 +210,18 @@ export function getActiveFilters(dom) {
         pattern: dom.patternFilter.value,
         subPattern: dom.subPatternFilter.value,
         band: dom.bandFilter.value,
+        expectedMin: parseRangeFilter(dom.expectedMinFilter.value),
+        expectedMax: parseRangeFilter(dom.expectedMaxFilter.value),
+        deltaMin: parseRangeFilter(dom.deltaMinFilter.value),
+        deltaMax: parseRangeFilter(dom.deltaMaxFilter.value),
     };
+}
+
+function parseRangeFilter(raw) {
+    const v = String(raw || "").trim();
+    if (!v) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
 }
 
 export function hasActiveFilters(filters) {
@@ -218,7 +229,11 @@ export function hasActiveFilters(filters) {
         filters.searchText
         || (filters.pattern && filters.pattern !== "all")
         || (filters.subPattern && filters.subPattern !== "all")
-        || (filters.band && filters.band !== "all"),
+        || (filters.band && filters.band !== "all")
+        || filters.expectedMin != null
+        || filters.expectedMax != null
+        || filters.deltaMin != null
+        || filters.deltaMax != null,
     );
 }
 
@@ -240,6 +255,20 @@ function matchesFilters(row, filters) {
     }
 
     if (filters.searchText && !row._searchHaystack.includes(filters.searchText)) {
+        return false;
+    }
+
+    if (filters.expectedMin != null && row.expected < filters.expectedMin) {
+        return false;
+    }
+    if (filters.expectedMax != null && row.expected > filters.expectedMax) {
+        return false;
+    }
+
+    if (filters.deltaMin != null && row.deltaAbs < filters.deltaMin) {
+        return false;
+    }
+    if (filters.deltaMax != null && row.deltaAbs > filters.deltaMax) {
         return false;
     }
 

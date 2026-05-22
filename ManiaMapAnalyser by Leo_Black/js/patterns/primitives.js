@@ -181,7 +181,6 @@ export function svTime(chart) {
     total += (chart.LastNote - time);
     }
 
-    // A single non-1.0 interval (constant scroll speed or BPM artifact) is not SV
     if (nonOneIntervals <= 1) {
         return 0;
     }

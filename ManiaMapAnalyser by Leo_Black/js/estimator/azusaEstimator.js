@@ -6,30 +6,19 @@ const AZUSA_CONFIG = Object.freeze({
     rcLnRatioLimit: 0.18,
     minNotes: 80,
     rowToleranceMs: 2,
-    quantiles: Object.freeze({
-        q99: 0.99,
-        q97: 0.97,
-        q94: 0.94,
-    }),
     skillWeights: Object.freeze({
-        speed: 0.38,
-        stamina: 0.26,
-        chord: 0.18,
-        tech: 0.18,
+        speed: 0.36,
+        stamina: 0.24,
+        chord: 0.12,
+        tech: 0.16,
+        jack: 0.12,
     }),
     localPower: 2.15,
-    postPower: 3.4,
     decayWindowsMs: Object.freeze([140, 280, 560, 980]),
     decayWeights: Object.freeze([0.34, 0.30, 0.22, 0.14]),
-    rcBlendWeights: Object.freeze({
-        azusaResidual: 0.05,
-        sunnyResidual: 0.15,
-        lowRangeLift: 0.40,
-        danielFallback: 0.75,
-        azusaFallback: 0.20,
-        sunnyFallback: 0.08,
-        globalOffset: -0.50,
-    }),
+    lengthRefNotes: 600,
+    lengthExponent: 0.22,
+    lengthCap: 3.5,
 });
 
 const GREEK_BY_INDEX = Object.freeze([
@@ -116,142 +105,85 @@ const AZUSA_CALIBRATION_HIGH_BLOCKS = Object.freeze([
 ]);
 
 const AZUSA_ISOTONIC_POINTS = Object.freeze([
-    [1.2900, 1],
-    [1.2900, 1],
-    [1.3900, 1],
-    [1.3900, 1],
-    [1.4700, 1],
-    [1.4700, 1],
-    [1.9000, 2],
-    [1.9000, 2],
-    [2.0600, 2],
-    [2.2200, 2],
-    [2.3200, 2],
-    [2.3200, 2],
-    [2.5100, 3],
-    [2.5100, 3],
-    [2.9000, 3.3333333333333335],
-    [2.9800, 3.3333333333333335],
-    [4.0100, 4],
-    [4.0100, 4],
-    [4.5100, 4],
-    [4.5100, 4],
-    [4.8300, 4.2],
-    [4.8300, 4.2],
-    [4.9400, 5],
-    [4.9400, 5],
-    [5.0400, 5],
-    [5.0400, 5],
-    [5.2000, 5],
-    [5.2000, 5],
-    [5.2800, 5],
-    [5.2800, 5],
-    [5.3300, 5.666666666666667],
-    [5.5900, 5.666666666666667],
-    [5.7700, 6],
-    [5.7700, 6],
-    [5.8700, 6],
-    [5.8700, 6],
-    [5.8700, 6],
-    [5.8700, 6],
-    [6.0700, 6.6],
-    [6.0700, 6.6],
-    [6.3300, 6.733333333333333],
-    [6.9200, 6.733333333333333],
-    [7.1100, 7],
-    [7.1100, 7],
-    [7.4600, 8.3],
-    [8.0500, 8.3],
-    [8.2500, 8.333333333333334],
-    [8.4800, 8.333333333333334],
-    [9.3200, 9.183333333333334],
-    [9.6200, 9.183333333333334],
-    [9.6400, 9.5],
-    [9.7100, 9.5],
-    [9.9800, 10.325],
-    [10.1500, 10.325],
-    [10.3000, 10.37142857142857],
-    [10.9900, 10.37142857142857],
-    [11.0000, 10.9],
-    [11.0400, 10.9],
-    [11.0700, 11.22857142857143],
-    [11.3600, 11.22857142857143],
-    [11.4500, 11.866666666666667],
-    [11.7400, 11.866666666666667],
-    [11.9300, 12.0875],
-    [12.2000, 12.0875],
-    [12.2900, 12.466666666666667],
-    [12.5200, 12.466666666666667],
-    [12.5600, 12.5],
-    [12.6400, 12.5],
-    [12.7400, 12.56],
-    [12.9200, 12.56],
-    [12.9800, 12.6],
-    [12.9800, 12.6],
-    [12.9900, 12.7],
-    [12.9900, 12.7],
-    [13.0000, 13],
-    [13.0000, 13],
-    [13.0400, 13.266666666666667],
-    [13.2800, 13.266666666666667],
-    [13.2900, 13.533333333333333],
-    [13.3300, 13.533333333333333],
-    [13.3400, 13.55],
-    [13.3600, 13.55],
-    [13.4000, 13.62],
-    [13.5600, 13.62],
-    [13.7200, 13.8],
-    [13.7200, 13.8],
-    [13.9500, 14],
-    [13.9500, 14],
-    [14.0200, 14],
-    [14.0200, 14],
-    [14.0500, 14.05],
-    [14.2000, 14.05],
-    [14.2100, 14.199999999999998],
-    [14.3400, 14.199999999999998],
-    [14.3700, 14.266666666666666],
-    [14.3700, 14.266666666666666],
-    [14.4400, 14.4],
-    [14.4400, 14.4],
-    [14.4400, 14.4],
-    [14.4400, 14.4],
-    [14.4700, 14.5],
-    [14.4700, 14.5],
-    [14.5200, 14.674999999999999],
-    [14.6700, 14.674999999999999],
-    [14.8000, 14.825],
-    [14.9000, 14.825],
-    [14.9300, 15],
-    [15.1500, 15],
-    [15.3100, 15.2],
-    [15.3500, 15.2],
-    [15.3700, 15.666666666666666],
-    [15.5300, 15.666666666666666],
-    [15.5400, 15.675],
-    [15.7200, 15.675],
-    [15.7200, 15.8],
-    [15.7200, 15.8],
-    [15.7500, 15.9],
-    [15.7500, 15.9],
-    [15.7800, 16],
-    [16.0700, 16],
-    [16.0900, 16.266666666666666],
-    [16.1500, 16.266666666666666],
-    [16.3500, 16.4],
-    [16.3500, 16.4],
-    [16.3500, 16.4],
-    [16.3500, 16.4],
-    [16.4100, 16.4],
-    [16.5100, 16.4],
-    [16.5300, 16.533333333333335],
-    [16.6500, 16.533333333333335],
-    [17.5500, 17.2],
-    [17.5500, 17.2],
-    [17.6800, 17.2],
-    [17.6800, 17.2],
-    [17.9100, 17.95],
-    [18.0200, 17.95],
+    [1.3868, 1.0000],
+    [1.4574, 1.0000],
+    [1.5361, 1.0000],
+    [1.6326, 1.5000],
+    [2.0007, 2.5000],
+    [2.2751, 2.5714],
+    [3.8271, 3.6000],
+    [4.2069, 4.2667],
+    [4.6782, 4.6600],
+    [5.1086, 5.0000],
+    [5.1924, 5.0000],
+    [5.3513, 5.3000],
+    [5.7501, 6.0000],
+    [5.8789, 6.0000],
+    [5.9131, 6.0000],
+    [6.0330, 6.5750],
+    [6.1322, 7.0000],
+    [6.8325, 7.2000],
+    [7.4165, 8.0000],
+    [8.3718, 8.2250],
+    [9.4673, 9.2500],
+    [9.8051, 9.2500],
+    [9.9915, 10.4333],
+    [10.0736, 10.5000],
+    [10.1115, 10.5000],
+    [10.1426, 10.6000],
+    [10.5351, 10.6333],
+    [10.8790, 10.7429],
+    [11.0725, 11.2111],
+    [11.3297, 11.2909],
+    [11.4937, 11.3500],
+    [11.5773, 11.4000],
+    [11.6024, 11.5000],
+    [11.6924, 11.6000],
+    [11.8875, 12.0625],
+    [12.0611, 12.2556],
+    [12.1974, 12.4000],
+    [12.6420, 12.4737],
+    [12.8839, 12.8000],
+    [12.9247, 12.9833],
+    [13.1878, 13.2808],
+    [13.3917, 13.3000],
+    [13.4695, 13.4000],
+    [13.4901, 13.4667],
+    [13.5467, 13.5000],
+    [13.5973, 13.7571],
+    [13.8704, 13.8385],
+    [14.0827, 13.9200],
+    [14.2189, 14.0667],
+    [14.3176, 14.1250],
+    [14.3773, 14.1643],
+    [14.4384, 14.2091],
+    [14.5063, 14.3750],
+    [14.5435, 14.4778],
+    [14.6271, 14.5357],
+    [14.6779, 14.5500],
+    [14.7216, 14.6538],
+    [14.7851, 14.7333],
+    [14.9000, 14.7526],
+    [15.0112, 14.8714],
+    [15.0576, 14.9182],
+    [15.2142, 15.0625],
+    [15.2974, 15.1000],
+    [15.3264, 15.1000],
+    [15.4083, 15.1692],
+    [15.5250, 15.3500],
+    [15.8009, 15.5346],
+    [16.0262, 16.0000],
+    [16.2183, 16.0950],
+    [16.3916, 16.2000],
+    [16.4316, 16.2000],
+    [16.5094, 16.3000],
+    [16.5915, 16.4000],
+    [16.6157, 16.4000],
+    [16.7156, 16.8000],
+    [17.1446, 17.0500],
+    [17.5478, 17.2000],
+    [17.7603, 17.2000],
+    [17.9706, 17.9500],
 ]);
 
 function buildErrorResult(code, message, extras = {}) {
@@ -276,10 +208,42 @@ function clamp(value, min, max) {
 }
 
 function safeDiv(a, b, fallback = 0) {
-    if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(b) < 1e-9) {
-        return fallback;
-    }
+    if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(b) < 1e-9) return fallback;
     return a / b;
+}
+
+function fmt4(value) {
+    return Number.isFinite(value) ? Number(value.toFixed(4)) : null;
+}
+
+function piecewiseLinear(x, knots, valueCol = 1) {
+    const v = Number(x);
+    if (!Number.isFinite(v) || !Array.isArray(knots) || knots.length === 0) return v;
+    if (v <= knots[0][0]) return knots[0][valueCol];
+    const last = knots.length - 1;
+    if (v >= knots[last][0]) return knots[last][valueCol];
+    for (let i = 0; i < last; i += 1) {
+        const x0 = knots[i][0], y0 = knots[i][valueCol];
+        const x1 = knots[i + 1][0], y1 = knots[i + 1][valueCol];
+        if (v >= x0 && v <= x1) return y0 + safeDiv((v - x0) * (y1 - y0), x1 - x0, 0);
+    }
+    return v;
+}
+
+function piecewiseBlock(x, blocks) {
+    const v = Number(x);
+    if (!Number.isFinite(v) || !Array.isArray(blocks) || blocks.length === 0) return v;
+    if (v <= blocks[0][0]) return blocks[0][2];
+    const last = blocks.length - 1;
+    for (let i = 0; i < blocks.length; i += 1) {
+        const [x0, x1, y] = blocks[i];
+        if (v >= x0 && v <= x1) return y;
+        if (i < last && v > x1 && v < blocks[i + 1][0]) {
+            const t = safeDiv(v - x1, blocks[i + 1][0] - x1, 0);
+            return y * (1 - t) + blocks[i + 1][2] * t;
+        }
+    }
+    return blocks[last][2];
 }
 
 function formatRcBaseLabel(base) {
@@ -470,6 +434,7 @@ function buildDifficultyCurve(taps) {
         stamina: Array.from({ length: AZUSA_CONFIG.decayWindowsMs.length }, () => 0),
         chord: Array.from({ length: AZUSA_CONFIG.decayWindowsMs.length }, () => 0),
         tech: Array.from({ length: AZUSA_CONFIG.decayWindowsMs.length }, () => 0),
+        jack: Array.from({ length: AZUSA_CONFIG.decayWindowsMs.length }, () => 0),
     };
 
     const lastByColumn = [-1e9, -1e9, -1e9, -1e9];
@@ -488,6 +453,7 @@ function buildDifficultyCurve(taps) {
     const staminaSeries = [];
     const chordSeries = [];
     const techSeries = [];
+    const jackSeries = [];
     const times = [];
 
     let prevTime = taps[0]?.t ?? 0;
@@ -529,9 +495,10 @@ function buildDifficultyCurve(taps) {
         const rowChord = Math.max(0, note.rowSize - 1);
         const chord = Math.pow(rowChord + 1, 1.22) - 1;
 
-        const speedInput = 0.54 * stream + 0.28 * handStream + 0.18 * jack;
+        const speedInput = 0.60 * stream + 0.30 * handStream + 0.10 * jack;
+        const jackInput = jack * (1 + 0.15 * chord);
         const staminaInput = 0.48 * (d500 / 11) + 0.27 * (d250 / 15) + 0.25 * stream;
-        const chordInput = chord * (1 + 0.22 * Math.min(1.5, stream));
+        const chordInput = chord * (1 + 0.10 * Math.min(1.5, stream));
         const techInput = 0.45 * rhythmChaos + 0.30 * movement + 0.25 * (rowChord > 0 ? 1 + 0.3 * rowChord : 0);
 
         for (let j = 0; j < AZUSA_CONFIG.decayWindowsMs.length; j += 1) {
@@ -541,27 +508,26 @@ function buildDifficultyCurve(taps) {
             states.stamina[j] = states.stamina[j] * decay + staminaInput;
             states.chord[j] = states.chord[j] * decay + chordInput;
             states.tech[j] = states.tech[j] * decay + techInput;
+            states.jack[j] = states.jack[j] * decay + jackInput;
         }
 
         const speedSkill = skillFromStates(states.speed);
         const staminaSkill = skillFromStates(states.stamina);
         const chordSkill = skillFromStates(states.chord);
         const techSkill = skillFromStates(states.tech);
+        const jackSkill = skillFromStates(states.jack);
 
         const p = AZUSA_CONFIG.localPower;
+        const sw = AZUSA_CONFIG.skillWeights;
         const combined = Math.pow(
             (
-                AZUSA_CONFIG.skillWeights.speed * Math.pow(Math.max(speedSkill, 0), p)
-                + AZUSA_CONFIG.skillWeights.stamina * Math.pow(Math.max(staminaSkill, 0), p)
-                + AZUSA_CONFIG.skillWeights.chord * Math.pow(Math.max(chordSkill, 0), p)
-                + AZUSA_CONFIG.skillWeights.tech * Math.pow(Math.max(techSkill, 0), p)
+                sw.speed * Math.pow(Math.max(speedSkill, 0), p)
+                + sw.stamina * Math.pow(Math.max(staminaSkill, 0), p)
+                + sw.chord * Math.pow(Math.max(chordSkill, 0), p)
+                + sw.tech * Math.pow(Math.max(techSkill, 0), p)
+                + sw.jack * Math.pow(Math.max(jackSkill, 0), p)
             )
-            / (
-                AZUSA_CONFIG.skillWeights.speed
-                + AZUSA_CONFIG.skillWeights.stamina
-                + AZUSA_CONFIG.skillWeights.chord
-                + AZUSA_CONFIG.skillWeights.tech
-            ),
+            / (sw.speed + sw.stamina + sw.chord + sw.tech + sw.jack),
             1 / p,
         );
 
@@ -570,6 +536,7 @@ function buildDifficultyCurve(taps) {
         staminaSeries.push(staminaSkill);
         chordSeries.push(chordSkill);
         techSeries.push(techSkill);
+        jackSeries.push(jackSkill);
         times.push(t);
 
         prevAny2 = prevAny1;
@@ -586,6 +553,7 @@ function buildDifficultyCurve(taps) {
         staminaSeries,
         chordSeries,
         techSeries,
+        jackSeries,
         times,
         density250,
         density500,
@@ -619,36 +587,46 @@ function computeAzusaNumericFromCurve(curve, noteCount) {
     const stamina = summarize(curve.staminaSeries);
     const chord = summarize(curve.chordSeries);
     const tech = summarize(curve.techSeries);
+    const jack = summarize(curve.jackSeries);
 
     const density250 = powerMean(curve.density250, 1.18);
     const density500 = powerMean(curve.density500, 1.12);
-    const lengthBoost = Math.log1p(noteCount / 140);
+    const { lengthRefNotes, lengthExponent, lengthCap } = AZUSA_CONFIG;
+    const lengthBoost = Math.min(lengthCap, Math.pow(Math.max(noteCount, 1) / lengthRefNotes, lengthExponent));
 
     const peakBlend =
         (0.26 * speed.q97)
-        + (0.24 * stamina.q97)
-        + (0.18 * chord.q97)
-        + (0.12 * tech.q97)
-        + (0.07 * speed.q90)
-        + (0.05 * stamina.q90)
-        + (0.03 * chord.q90)
-        + (0.02 * tech.q90);
+        + (0.22 * stamina.q97)
+        + (0.10 * chord.q97)
+        + (0.10 * tech.q97)
+        + (0.10 * jack.q97)
+        + (0.06 * speed.q90)
+        + (0.04 * stamina.q90)
+        + (0.02 * chord.q90)
+        + (0.02 * tech.q90)
+        + (0.02 * jack.q90);
 
     const sustainBlend =
-        (0.20 * speed.q75)
-        + (0.18 * stamina.q75)
-        + (0.11 * chord.q75)
-        + (0.08 * tech.q75)
-        + (0.12 * speed.tailMean)
-        + (0.10 * stamina.tailMean)
-        + (0.06 * chord.tailMean)
-        + (0.05 * tech.tailMean);
+        (0.18 * speed.q75)
+        + (0.16 * stamina.q75)
+        + (0.08 * chord.q75)
+        + (0.06 * tech.q75)
+        + (0.08 * jack.q75)
+        + (0.10 * speed.tailMean)
+        + (0.08 * stamina.tailMean)
+        + (0.04 * chord.tailMean)
+        + (0.04 * tech.tailMean)
+        + (0.04 * jack.tailMean);
 
     const densityBlend = (0.14 * Math.log1p(density250)) + (0.22 * Math.log1p(density500));
-    const midBlend = (0.18 * speed.q50) + (0.15 * stamina.q50) + (0.10 * chord.q50) + (0.08 * tech.q50);
+    const midBlend =
+        (0.16 * speed.q50) + (0.13 * stamina.q50)
+        + (0.06 * chord.q50) + (0.06 * tech.q50) + (0.06 * jack.q50);
 
-    const raw = (0.58 * peakBlend) + (0.24 * sustainBlend) + (0.10 * densityBlend) + (0.08 * midBlend) + (0.06 * lengthBoost);
-    const scaled = 0.82 + (0.41 * raw);
+    const raw =
+        (0.52 * peakBlend) + (0.26 * sustainBlend)
+        + (0.10 * densityBlend) + (0.08 * midBlend) + (0.04 * lengthBoost);
+    const scaled = 0.82 + (0.43 * raw);
 
     const maxColumn = Math.max(...curve.columnCounts);
     const anchorImbalance = safeDiv((maxColumn / Math.max(noteCount, 1)) - 0.25, 0.75, 0);
@@ -656,26 +634,21 @@ function computeAzusaNumericFromCurve(curve, noteCount) {
     const jackSorted = [...curve.jackRawSeries].sort((a, b) => a - b);
     const jackQ95 = quantileFromSorted(jackSorted, 0.95);
 
-    const jackAnchorBoost = clamp(
-        1.65
-        * Math.max(0, anchorImbalance)
-        * Math.max(0, 1 - (1.85 * chordRate))
-        * Math.max(0, jackQ95 - 2.2),
+    // Chordjack interaction: chord density × jack density co-occurrence
+    const chordjackBoost = clamp(
+        2.5
+        * clamp((chordRate - 0.40) * 3.5, 0, 1)
+        * clamp((jackQ95 - 1.25) * 2.8, 0, 1)
+        * clamp(1 - (anchorImbalance * 8), 0, 1),
         0,
         2.2,
     );
 
-    const lowJackBoost = clamp(
-        1.1
-        * clamp((12.2 - scaled) / 4.5, 0, 1)
-        * Math.max(0, anchorImbalance - 0.08)
-        * Math.max(0, jackQ95 - 1.7)
-        * (0.9 + (0.6 * Math.max(0, 0.22 - chordRate))),
-        0,
-        1.35,
-    );
+    const totalTimeSec = Math.max(1, (curve.times[curve.times.length - 1] - curve.times[0]) / 1000);
+    const avgNPS = noteCount / totalTimeSec;
+    const midSpeedBonus = clamp((avgNPS - 9) * 0.04, 0, 0.35) * clamp((19 - avgNPS) * 0.25, 0, 1);
 
-    const corrected = scaled + jackAnchorBoost + lowJackBoost;
+    const corrected = scaled + chordjackBoost + midSpeedBonus;
     return clamp(corrected, -2, 20);
 }
 
@@ -744,12 +717,12 @@ function resolveRcBlendComponents(primaryNumeric, danielNumeric, sunnyNumeric, c
         const jackQ95 = Number.isFinite(curveHints?.jackQ95) ? curveHints.jackQ95 : null;
         if (anchorImbalance != null && chordRate != null && jackQ95 != null) {
             const anchorLift = clamp(
-                0.96
+                0.20
                 * Math.max(0, jackQ95 - 2.08)
                 * Math.max(0, 0.24 - chordRate)
                 * Math.max(0, anchorImbalance - 0.10),
                 0,
-                0.88,
+                0.25,
             );
             value += anchorLift;
         }
@@ -804,96 +777,23 @@ function resolveRcBlendComponents(primaryNumeric, danielNumeric, sunnyNumeric, c
     };
 }
 
-function interpolateCalibration(value, knots) {
-    const x = Number(value);
-    if (!Number.isFinite(x) || !Array.isArray(knots) || knots.length < 2) {
-        return x;
-    }
-
-    if (x <= knots[0][0]) {
-        return knots[0][1];
-    }
-
-    const last = knots.length - 1;
-    if (x >= knots[last][0]) {
-        return knots[last][1];
-    }
-
-    for (let i = 0; i < last; i += 1) {
-        const x0 = knots[i][0];
-        const y0 = knots[i][1];
-        const x1 = knots[i + 1][0];
-        const y1 = knots[i + 1][1];
-        if (x >= x0 && x <= x1) {
-            return y0 + safeDiv((x - x0) * (y1 - y0), x1 - x0, 0);
-        }
-    }
-
-    return x;
-}
-
-function interpolateCalibrationBlocks(value, blocks) {
-    const x = Number(value);
-    if (!Number.isFinite(x) || !Array.isArray(blocks) || blocks.length === 0) {
-        return x;
-    }
-
-    if (x <= blocks[0][0]) {
-        return blocks[0][2];
-    }
-
-    for (let i = 0; i < blocks.length; i += 1) {
-        const [x0, x1, y] = blocks[i];
-        if (x >= x0 && x <= x1) {
-            return y;
-        }
-
-        if (i < blocks.length - 1) {
-            const next = blocks[i + 1];
-            const nextX0 = next[0];
-            if (x > x1 && x < nextX0) {
-                const t = safeDiv(x - x1, nextX0 - x1, 0);
-                return (y * (1 - t)) + (next[2] * t);
-            }
-        }
-    }
-
-    return blocks[blocks.length - 1][2];
-}
-
 function calibrateAzusaNumeric(value, lowGate = null, highGate = null) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-        return numeric;
-    }
-
-    const low = interpolateCalibrationBlocks(numeric, AZUSA_CALIBRATION_LOW_BLOCKS);
-    const high = interpolateCalibrationBlocks(numeric, AZUSA_CALIBRATION_HIGH_BLOCKS);
-
+    const v = Number(value);
+    if (!Number.isFinite(v)) return v;
+    const low = piecewiseBlock(v, AZUSA_CALIBRATION_LOW_BLOCKS);
+    const high = piecewiseBlock(v, AZUSA_CALIBRATION_HIGH_BLOCKS);
     const lg = Number.isFinite(lowGate) ? clamp(Number(lowGate), 0, 1) : null;
     const hg = Number.isFinite(highGate) ? clamp(Number(highGate), 0, 1) : null;
-
-    if (lg == null && hg == null) {
-        return numeric < 11 ? low : high;
-    }
-
-    const lowWeight = lg ?? Math.max(0, 1 - (hg ?? 0));
-    const highWeight = hg ?? Math.max(0, 1 - lowWeight);
-    const weightSum = lowWeight + highWeight;
-    if (weightSum <= 1e-6) {
-        return numeric < 11 ? low : high;
-    }
-
-    return ((lowWeight * low) + (highWeight * high)) / weightSum;
+    if (lg == null && hg == null) return v < 11 ? low : high;
+    const lw = lg ?? Math.max(0, 1 - (hg ?? 0));
+    const hw = hg ?? Math.max(0, 1 - lw);
+    const ws = lw + hw;
+    if (ws <= 1e-6) return v < 11 ? low : high;
+    return (lw * low + hw * high) / ws;
 }
 
 function calibrateAzusaOutputNumeric(value) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-        return numeric;
-    }
-
-    return interpolateCalibration(numeric, AZUSA_ISOTONIC_POINTS);
+    return piecewiseLinear(Number(value), AZUSA_ISOTONIC_POINTS, 1);
 }
 
 function computeCurveGapResidualCorrection(baseNumeric, blendDetails, curveStats, primaryNumeric, sunnyNumeric, danielNumeric) {
@@ -937,46 +837,41 @@ function computeCurveGapResidualCorrection(baseNumeric, blendDetails, curveStats
     return clamp(residual, -1.2, 1.2);
 }
 
-function computePostOutputCurveGapResidualCorrection(baseNumeric, blendDetails, curveStats, primaryNumeric, sunnyNumeric, danielNumeric) {
-    const x = Number(baseNumeric);
-    if (!Number.isFinite(x)) {
-        return 0;
+function computeReferenceCorrection(azusaEst, danielNumeric, sunnyNumeric) {
+    const x = Number(azusaEst);
+    if (!Number.isFinite(x)) return 0;
+
+    if (x < 10.0 || x > 17.5) return 0;
+
+    const daniel = Number.isFinite(danielNumeric) ? danielNumeric : null;
+    const sunny = Number.isFinite(sunnyNumeric) ? sunnyNumeric : null;
+
+    // Range-dependent gate and coefficients
+    let gate, coeffD, coeffS;
+
+    if (x < 11.5) {
+        gate = clamp((x - 10.0) / 1.5, 0, 1);
+        coeffD = 0.10;
+        coeffS = 0.06;
+    } else if (x < 12.5) {
+        gate = 1.0;
+        coeffD = 0.20;
+        coeffS = 0.13;
+    } else if (x < 16.0) {
+        gate = 1.0;
+        coeffD = 0.40;
+        coeffS = 0.25;
+    } else {
+        gate = clamp((17.5 - x) / 1.5, 0, 1);
+        coeffD = 0.28;
+        coeffS = 0.17;
     }
 
-    const highGate = Number.isFinite(blendDetails?.highGate) ? clamp(blendDetails.highGate, 0, 1) : 0;
-    const primary = Number.isFinite(primaryNumeric) ? primaryNumeric : x;
-    const sunny = Number.isFinite(sunnyNumeric) ? sunnyNumeric : x;
-    const daniel = Number.isFinite(danielNumeric) ? danielNumeric : x;
-    const anchorImbalance = Number.isFinite(curveStats?.anchorImbalance) ? curveStats.anchorImbalance : 0;
-    const chordRate = Number.isFinite(curveStats?.chordRate) ? curveStats.chordRate : 0;
-    const jackQ95 = Number.isFinite(curveStats?.jackQ95) ? curveStats.jackQ95 : x;
+    let correction = 0;
+    if (daniel != null) correction += coeffD * (daniel - x);
+    if (sunny != null) correction += coeffS * (sunny - x);
 
-    const ds = daniel - sunny;
-    const sp = sunny - primary;
-
-    const residual = 0.4 * (
-        0.979895
-        + (0.053556 * x)
-        + (-1.050405 * Math.max(0, 11 - x))
-        + (0.942552 * Math.max(0, 12.5 - x))
-        + (0.048841 * Math.max(0, 14 - x))
-        + (-1.636218 * highGate)
-        + (0.956025 * highGate * Math.max(0, 11 - x))
-        + (-0.975188 * highGate * Math.max(0, 12.5 - x))
-        + (0.195107 * ds)
-        + (-0.064291 * sp)
-        + (-0.231542 * highGate * ds)
-        + (0.082201 * highGate * sp)
-        + (-0.634013 * anchorImbalance)
-        + (-0.490303 * chordRate)
-        + (-0.135176 * jackQ95)
-        + (-0.992539 * anchorImbalance * jackQ95)
-        + (-0.164219 * chordRate * jackQ95)
-        + (-1.027392 * highGate * anchorImbalance)
-        + (0.961530 * highGate * chordRate)
-    );
-
-    return clamp(residual, -1.0, 1.0);
+    return clamp(correction * gate, -1.2, 1.2);
 }
 
 export function runAzusaEstimatorFromText(osuText, options = {}) {
@@ -1104,15 +999,8 @@ export function runAzusaEstimatorFromText(osuText, options = {}) {
     );
     const preOutputNumeric = clamp(Number(calibratedNumeric) + curveGapResidual, -2, 20);
     const outputNumeric = calibrateAzusaOutputNumeric(preOutputNumeric);
-    const postCurveGapResidual = computePostOutputCurveGapResidualCorrection(
-        outputNumeric,
-        blendDetails,
-        { anchorImbalance, chordRate, jackQ95 },
-        primaryNumeric,
-        sunnyNumeric,
-        danielNumericForBlend,
-    );
-    const finalNumeric = clamp(Number(outputNumeric) + postCurveGapResidual, -2, 20);
+    const refCorrection = computeReferenceCorrection(outputNumeric, danielNumericForBlend, sunnyNumeric);
+    const finalNumeric = clamp(Number(outputNumeric) + refCorrection, -2, 20);
     const estDiff = numericToRcLabel(finalNumeric);
 
     const result = {
@@ -1125,29 +1013,29 @@ export function runAzusaEstimatorFromText(osuText, options = {}) {
         graph: withGraph ? (sunnyResult?.graph || null) : null,
         rawNumericDifficulty: Number(primaryNumeric.toFixed(4)),
         debug: {
-            primaryNumeric: Number(primaryNumeric.toFixed(4)),
-            blendNumeric: Number.isFinite(numericDifficulty) ? Number(numericDifficulty.toFixed(4)) : null,
-            danielNumeric: Number.isFinite(danielNumeric) ? Number(danielNumeric.toFixed(4)) : null,
-            danielNumericForBlend: Number.isFinite(danielNumericForBlend) ? Number(danielNumericForBlend.toFixed(4)) : null,
+            primaryNumeric: fmt4(primaryNumeric),
+            blendNumeric: fmt4(numericDifficulty),
+            danielNumeric: fmt4(danielNumeric),
+            danielNumericForBlend: fmt4(danielNumericForBlend),
             danielHasNativeNumeric,
-            sunnyNumeric: Number.isFinite(sunnyNumeric) ? Number(sunnyNumeric.toFixed(4)) : null,
+            sunnyNumeric: fmt4(sunnyNumeric),
             notes: taps.length,
-            calibratedNumeric: Number.isFinite(calibratedNumeric) ? Number(calibratedNumeric.toFixed(4)) : null,
+            calibratedNumeric: fmt4(calibratedNumeric),
             curveStats: {
-                anchorImbalance: Number.isFinite(anchorImbalance) ? Number(anchorImbalance.toFixed(4)) : null,
-                chordRate: Number.isFinite(chordRate) ? Number(chordRate.toFixed(4)) : null,
-                jackQ95: Number.isFinite(jackQ95) ? Number(jackQ95.toFixed(4)) : null,
+                anchorImbalance: fmt4(anchorImbalance),
+                chordRate: fmt4(chordRate),
+                jackQ95: fmt4(jackQ95),
             },
-            curveGapResidual: Number.isFinite(curveGapResidual) ? Number(curveGapResidual.toFixed(4)) : null,
-            outputNumeric: Number.isFinite(outputNumeric) ? Number(outputNumeric.toFixed(4)) : null,
-            postCurveGapResidual: Number.isFinite(postCurveGapResidual) ? Number(postCurveGapResidual.toFixed(4)) : null,
-            finalNumeric: Number.isFinite(finalNumeric) ? Number(finalNumeric.toFixed(4)) : null,
+            curveGapResidual: fmt4(curveGapResidual),
+            outputNumeric: fmt4(outputNumeric),
+            postCurveGapResidual: fmt4(refCorrection),
+            finalNumeric: fmt4(finalNumeric),
             blend: {
-                lowGateSource: Number.isFinite(blendDetails.lowGateSource) ? blendDetails.lowGateSource.toFixed(4) : null,
-                lowGate: Number.isFinite(blendDetails.lowGate) ? blendDetails.lowGate.toFixed(4) : null,
-                highGate: Number.isFinite(blendDetails.highGate) ? blendDetails.highGate.toFixed(4) : null,
-                lowBase: Number.isFinite(blendDetails.lowBase) ? blendDetails.lowBase.toFixed(4) : null,
-                highBase: Number.isFinite(blendDetails.highBase) ? blendDetails.highBase.toFixed(4) : null,
+                lowGateSource: blendDetails.lowGateSource?.toFixed(4) ?? null,
+                lowGate: blendDetails.lowGate?.toFixed(4) ?? null,
+                highGate: blendDetails.highGate?.toFixed(4) ?? null,
+                lowBase: blendDetails.lowBase?.toFixed(4) ?? null,
+                highBase: blendDetails.highBase?.toFixed(4) ?? null,
             },
         },
     };

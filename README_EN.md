@@ -15,7 +15,7 @@ This repository is an in-game overlay (pp counter) for [tosu](https://tosu.app),
 - **Difficulty Estimation**: Estimates difficulty based on beatmap data and provides detailed analysis results, offering multiple difficulty estimation algorithms. Compatible with LN and RC Dans for 4/6/7K.
 - **Chart Visualization**: Provides difficulty variation charts to help players better understand the difficulty distribution of a beatmap.
 - **Pattern Analysis**: Analyzes RC/LN pattern distribution in the beatmap to help players understand its structure.
-- **SV Detection (Experimental)**: Detects whether a beatmap is an SV map.
+- **SV Detection**: Detects whether a beatmap is an SV map.
 - **Highly Customizable**: Offers a wealth of customization options to meet the needs of different players.
 
 ## Usage
@@ -95,7 +95,7 @@ Note: It is recommended to start with the default settings and then adjust accor
         - Note: If the display of beatmap tag capsules is not enabled, the SV tag will not be displayed.
     - **Estimator Algorithm**: Choose the algorithm used for difficulty estimation.
         - Mixed: (Recommended) A hybrid algorithm combining the four below, offering relatively higher accuracy. Automatically selects the algorithm best suited for the current beatmap.
-        - Azusa: A Daniel-based algorithm tailored for 4K RC, incorporating adjustments based on the Suuny algorithm. It performs well in RC scenarios but is not suitable for LN-dominant beatmaps.
+        - Azusa: A hybrid algorithm oriented towards 4K RC, combining the below algorithms with specific adjustments, performing well in RC scenarios but not suitable for LN-dominant beatmaps.
         - Suuny: Maps directly to Dan star ratings using Suuny Rework, compatible with LN and RC Dans for 4/6/7K.
         - [Daniel](https://thebagelofman.github.io/Daniel/): Uses the Daniel algorithm for estimation, suitable for 4K Reform Alpha and above Dan difficulties.
         - [Companella](https://github.com/Leinadix/companella): Uses the Companella algorithm, suitable for 4K Reform Delta+ and below Dan difficulties.
@@ -124,6 +124,9 @@ Note: It is recommended to start with the default settings and then adjust accor
     - **Pause Detection Threshold**: Set the minimum duration (ms) for a time freeze to be counted as a pause.
         - A pause is only confirmed when the game time has been frozen for longer than this threshold.
         - Default is 500ms. If game lag causes false positives, increase this value.
+
+## Azusa Algorithm Explanation
+This algorithm is a hybrid based on the beatmap itself, combining the results of Daniel and Suuny Rework, with specific adjustments for 4K RC beatmaps. For more details, please refer to [this document](azusa_algorithm.md).
 
 ## References
 - [tosu](https://tosu.app): The runtime environment and basic framework for this plugin.

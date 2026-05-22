@@ -68,7 +68,8 @@
       "actions": {
         "reloadData": "重载数据",
         "uploadDataFolder": "上传数据文件夹",
-        "downloadCurrentData": "下载当前数据"
+        "downloadCurrentData": "下载当前数据",
+        "downloadDataset": "下载数据集"
       },
       "kpi": {
         "totalMaps": "总数",
@@ -145,6 +146,12 @@
         "pattern": "键型",
         "subPattern": "子键型",
         "band": "分档",
+        "expected": "预期值",
+        "expectedMinPlaceholder": "最小",
+        "expectedMaxPlaceholder": "最大",
+        "delta": "|偏差|",
+        "deltaMinPlaceholder": "最小",
+        "deltaMaxPlaceholder": "最大",
         "clear": "清除筛选"
       },
       "table": {

@@ -171,8 +171,27 @@ input[type="text"] {
     transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 
+select,
+input[type="number"] {
+    display: grid;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--panel-strong);
+    color: var(--text);
+    font: 600 0.95rem var(--font-ui);
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
 select:focus,
 input[type="text"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(128, 179, 255, 0.18);
+}
+
+select:focus,
+input[type="number"]:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(128, 179, 255, 0.18);
 }
@@ -451,9 +470,32 @@ tr.error-missing td {
     gap: 4px;
 }
 
+.table-controls label.range-label {
+    display: grid;
+    align-items: center;
+    gap: 4px;
+}
+
+.table-controls label.range-label > span:first-child {
+    white-space: nowrap;
+}
+
+.table-controls label.range-label input {
+    display: flex;
+    min-width: 0;
+    width: 5em;
+}
+
 .table-controls input,
 .table-controls select {
     min-width: 150px;
+}
+
+.range-sep {
+    color: var(--muted, #8892b0);
+    font-size: 0.85rem;
+    user-select: none;
+    flex-shrink: 0;
 }
 
 table {

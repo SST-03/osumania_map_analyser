@@ -68,7 +68,8 @@
       "actions": {
         "reloadData": "Reload Data",
         "uploadDataFolder": "Upload Data Folder",
-        "downloadCurrentData": "Download Current Data"
+        "downloadCurrentData": "Download Current Data",
+        "downloadDataset": "Download Dataset"
       },
       "kpi": {
         "totalMaps": "Total Maps",
@@ -145,6 +146,12 @@
         "pattern": "Pattern",
         "subPattern": "Sub Pattern",
         "band": "Band",
+        "expected": "Expected",
+        "expectedMinPlaceholder": "Min",
+        "expectedMaxPlaceholder": "Max",
+        "delta": "|Delta|",
+        "deltaMinPlaceholder": "Min",
+        "deltaMaxPlaceholder": "Max",
         "clear": "Clear Filters"
       },
       "table": {

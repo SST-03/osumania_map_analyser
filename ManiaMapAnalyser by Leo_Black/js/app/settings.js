@@ -419,14 +419,6 @@ export function applyCompanellaEtternaVersionSetting(value) {
     return changed;
 }
 
-export function applyPauseDetectionThresholdSetting(value) {
-    const num = Number(value);
-    const next = (Number.isFinite(num) && num > 0) ? Math.round(num) : APP_CONFIG.defaults.pauseDetectionThresholdMs;
-    const changed = state.pauseDetectionThresholdMs !== next;
-    state.pauseDetectionThresholdMs = next;
-    return changed;
-}
-
 export function applyPauseDetectionSetting(value) {
     const next = normalizeBooleanSetting(value, APP_CONFIG.defaults.pauseDetectionEnabled);
     const changed = state.pauseDetectionEnabled !== next;
@@ -446,6 +438,14 @@ export function applyPauseDetectionSetting(value) {
 
     updatePauseCountVisibility();
     redrawPauseMarkers();
+    return changed;
+}
+
+export function applyPauseDetectionThresholdSetting(value) {
+    const num = Number(value);
+    const next = (Number.isFinite(num) && num > 0) ? Math.round(num) : APP_CONFIG.defaults.pauseDetectionThresholdMs;
+    const changed = state.pauseDetectionThresholdMs !== next;
+    state.pauseDetectionThresholdMs = next;
     return changed;
 }
 
@@ -546,10 +546,6 @@ export function applyReverseCardExtendDirectionSetting(value) {
     state.reverseCardExtendDirection = next;
     applyVisualStyleSettings();
     return changed;
-}
-
-export function refreshVisualStyleSettings() {
-    applyVisualStyleSettings();
 }
 
 function extractSettingsPayloadFromCommandPacket(packet) {

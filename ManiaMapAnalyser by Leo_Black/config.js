@@ -14,7 +14,6 @@ export const APP_CONFIG = {
         cardRadius: ["Small", "Medium", "Large"],
         reverseCardExtendDirection: [true, false],
         modeTag: ["RC", "LN", "HB", "Mix", "SV"],
-        pauseDetectionThreshold: ["100", "200", "500", "1000"],
     },
 
     starStops: {

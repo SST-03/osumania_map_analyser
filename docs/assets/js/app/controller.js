@@ -388,12 +388,20 @@ function bindEvents() {
     dom.patternFilter.addEventListener("change", applyFiltersAndRender);
     dom.subPatternFilter.addEventListener("change", applyFiltersAndRender);
     dom.bandFilter.addEventListener("change", applyFiltersAndRender);
+    dom.expectedMinFilter.addEventListener("input", applyFiltersAndRender);
+    dom.expectedMaxFilter.addEventListener("input", applyFiltersAndRender);
+    dom.deltaMinFilter.addEventListener("input", applyFiltersAndRender);
+    dom.deltaMaxFilter.addEventListener("input", applyFiltersAndRender);
 
     dom.clearFilterButton.addEventListener("click", () => {
         dom.searchInput.value = "";
         dom.patternFilter.value = "all";
         dom.subPatternFilter.value = "all";
         dom.bandFilter.value = "all";
+        dom.expectedMinFilter.value = "";
+        dom.expectedMaxFilter.value = "";
+        dom.deltaMinFilter.value = "";
+        dom.deltaMaxFilter.value = "";
         applyFiltersAndRender();
     });
 
