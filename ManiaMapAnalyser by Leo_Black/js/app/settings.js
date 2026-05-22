@@ -548,6 +548,10 @@ export function applyReverseCardExtendDirectionSetting(value) {
     return changed;
 }
 
+export function refreshVisualStyleSettings() {
+    applyVisualStyleSettings();
+}
+
 function extractSettingsPayloadFromCommandPacket(packet) {
     if (Array.isArray(packet)) {
         return packet;

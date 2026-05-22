@@ -24,13 +24,19 @@ export function detectVibro(values, threshold) {
     return (jackSpeed / overall) >= threshold;
 }
 
-export function detectVibroFromLongjackPattern(patternReport, threshold) {
+export function detectVibroFromLongjackPattern(patternReport, threshold, minBpm) {
     if (!patternReport || !Array.isArray(patternReport.Clusters)) {
         return false;
     }
 
+    const bpmLimit = Number.isFinite(minBpm) && minBpm > 0 ? minBpm : 0;
+
     for (const cluster of patternReport.Clusters) {
         if (!Array.isArray(cluster.SpecificTypes)) {
+            continue;
+        }
+        const clusterBpm = Number(cluster.BPM);
+        if (!Number.isFinite(clusterBpm) || clusterBpm < bpmLimit) {
             continue;
         }
         for (const [name, ratio] of cluster.SpecificTypes) {

@@ -6,7 +6,7 @@ import {
     updatePauseCountVisibility,
 } from "./hud.js";
 import { setRecomputeHandler, scheduleRecompute } from "./scheduler.js";
-import { loadSettings } from "./settings.js";
+import { loadSettings, refreshVisualStyleSettings } from "./settings.js";
 import { setupSocketListener } from "./socketHandlers.js";
 
 setRecomputeHandler(fetchBeatmapFile);
@@ -16,6 +16,7 @@ export async function initialize() {
     updateModeTagVisibility();
     updatePauseCountVisibility();
     updateCardPlayVisibility();
+    refreshVisualStyleSettings();
     startGraphAnimationLoop();
     setupSocketListener();
     scheduleRecompute("initial load", false);

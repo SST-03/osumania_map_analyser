@@ -483,7 +483,7 @@ export async function fetchBeatmapFile(reason) {
                     && vibroEligible
                     && (
                         detectVibro(ettResult?.values, VIBRO_JACKSPEED_RATIO_THRESHOLD)
-                        || detectVibroFromLongjackPattern(patternReport, PATTERNS_CONFIG.LONGJACK_VIBRO_RATIO_THRESHOLD)
+                        || detectVibroFromLongjackPattern(patternReport, PATTERNS_CONFIG.LONGJACK_VIBRO_RATIO_THRESHOLD, PATTERNS_CONFIG.LONGJACK_VIBRO_MIN_BPM)
                     );
 
                 if (activeContentBar === "Etterna") {
