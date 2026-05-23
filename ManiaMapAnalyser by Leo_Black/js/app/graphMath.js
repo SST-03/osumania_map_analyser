@@ -1,27 +1,47 @@
-export function buildLinePath(points) {
-    if (!points.length) {
-        return "";
-    }
+export function f2(v) {
+    return Number.isFinite(v) ? v.toFixed(2) : "0.00";
+}
 
-    let path = `M ${points[0][0].toFixed(2)} ${points[0][1].toFixed(2)}`;
-    for (let i = 1; i < points.length; i += 1) {
-        path += ` L ${points[i][0].toFixed(2)} ${points[i][1].toFixed(2)}`;
+export function buildLinePath(points) {
+    const len = points.length;
+    if (!len) return "";
+
+    const parts = new Array(len * 2 + 2);
+    parts[0] = "M";
+    parts[1] = f2(points[0][0]);
+    parts[2] = f2(points[0][1]);
+    let wi = 3;
+    for (let i = 1; i < len; i++) {
+        parts[wi++] = "L";
+        parts[wi++] = f2(points[i][0]);
+        parts[wi++] = f2(points[i][1]);
     }
-    return path;
+    return parts.join(" ");
 }
 
 export function buildFillPath(points, baseY) {
-    if (!points.length) {
-        return "";
-    }
+    const len = points.length;
+    if (!len) return "";
 
-    let path = `M ${points[0][0].toFixed(2)} ${baseY.toFixed(2)}`;
-    path += ` L ${points[0][0].toFixed(2)} ${points[0][1].toFixed(2)}`;
-    for (let i = 1; i < points.length; i += 1) {
-        path += ` L ${points[i][0].toFixed(2)} ${points[i][1].toFixed(2)}`;
+    const baseYs = f2(baseY);
+    const parts = new Array(len * 3 + 8);
+    parts[0] = "M";
+    parts[1] = f2(points[0][0]);
+    parts[2] = baseYs;
+    parts[3] = "L";
+    parts[4] = f2(points[0][0]);
+    parts[5] = f2(points[0][1]);
+    let wi = 6;
+    for (let i = 1; i < len; i++) {
+        parts[wi++] = "L";
+        parts[wi++] = f2(points[i][0]);
+        parts[wi++] = f2(points[i][1]);
     }
-    path += ` L ${points[points.length - 1][0].toFixed(2)} ${baseY.toFixed(2)} Z`;
-    return path;
+    parts[wi++] = "L";
+    parts[wi++] = f2(points[len - 1][0]);
+    parts[wi++] = baseYs;
+    parts[wi++] = "Z";
+    return parts.join(" ");
 }
 
 export function normalizeGraphSeries(graphData, resampleIntervalMs) {
@@ -33,38 +53,50 @@ export function normalizeGraphSeries(graphData, resampleIntervalMs) {
         return null;
     }
 
-    const times = [];
-    const values = [];
+    // Pre-allocate for speed
+    const times = new Array(length);
+    const values = new Array(length);
+    let wi = 0;
 
     let lastTime = Number.NEGATIVE_INFINITY;
     let lastValue = 0;
+
+    // Track min/max in the same pass
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
     for (let i = 0; i < length; i += 1) {
         let time = rawTimes.length > 0 ? Number(rawTimes[i]) : i * resampleIntervalMs;
         let value = rawValues.length > 0 ? Number(rawValues[i]) : lastValue;
 
-        if (!Number.isFinite(time)) {
-            continue;
-        }
+        if (!Number.isFinite(time)) continue;
 
         if (!Number.isFinite(value)) {
-            value = values.length > 0 ? values[values.length - 1] : 0;
+            value = wi > 0 ? values[wi - 1] : 0;
         }
 
         if (time <= lastTime) {
             time = lastTime + 1;
         }
 
-        times.push(time);
-        values.push(value);
+        times[wi] = time;
+        values[wi] = value;
+        if (value < minY) minY = value;
+        if (value > maxY) maxY = value;
         lastTime = time;
         lastValue = value;
+        wi += 1;
     }
 
-    if (times.length < 2) {
-        return null;
+    if (wi < 2) return null;
+
+    // Trim to actual count
+    if (wi < length) {
+        times.length = wi;
+        values.length = wi;
     }
 
-    return { times, values };
+    return { times, values, minYValue: minY, maxYValue: maxY };
 }
 
 export function interpolateSeriesValue(times, values, targetTime) {

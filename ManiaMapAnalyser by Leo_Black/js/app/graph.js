@@ -500,12 +500,24 @@ export function startGraphAnimationLoop() {
     requestAnimationFrame(tick);
 }
 
+// toFixed(1) is sufficient for a 260px-wide viewBox — saves ~20% string length vs (2)
+function f1(v) {
+    return Number.isFinite(v) ? v.toFixed(1) : "0";
+}
+
 export function renderDiffGraph(graphData) {
     if (!hasAnyGraphModeEnabled()) {
         return false;
     }
 
     const normalizedSeries = normalizeGraphSeries(graphData, GRAPH_RESAMPLE_INTERVAL_MS);
+    if (!normalizedSeries) {
+        showDiffGraphError("Graph unavailable");
+        return false;
+    }
+
+    const { minYValue: preMinY, maxYValue: preMaxY } = normalizedSeries;
+
     const series = trimSeriesStartToFirstObject(normalizedSeries);
     if (!series) {
         showDiffGraphError("Graph unavailable");
@@ -513,69 +525,89 @@ export function renderDiffGraph(graphData) {
     }
 
     const { times, values } = series;
+    const len = values.length;
 
-    setGraphLoading(false);
-
-    let minYValue = Number.POSITIVE_INFINITY;
-    let maxYValue = Number.NEGATIVE_INFINITY;
-    for (let i = 0; i < values.length; i += 1) {
-        const value = values[i];
-        if (value < minYValue) {
-            minYValue = value;
-        }
-        if (value > maxYValue) {
-            maxYValue = value;
-        }
-    }
-    const valueSpan = Math.max(0.001, maxYValue - minYValue);
+    const minYValue = preMinY;
+    const maxYValue = preMaxY;
+    const valueSpan = maxYValue - minYValue > 0.001 ? maxYValue - minYValue : 0.001;
 
     const minTime = times[0];
-    const maxTime = times[times.length - 1];
-    const timeSpan = Math.max(1, maxTime - minTime);
+    const maxTime = times[len - 1];
+    const timeSpan = maxTime - minTime > 1 ? maxTime - minTime : 1;
 
     const xMin = GRAPH_PADDING_X;
     const xMax = GRAPH_VIEWBOX_WIDTH - GRAPH_PADDING_X;
     const yMin = GRAPH_PADDING_TOP;
     const yMax = GRAPH_VIEWBOX_HEIGHT - GRAPH_PADDING_BOTTOM;
+    const ySpan = yMax - yMin;
+    const xSpan = xMax - xMin;
 
-    const points = new Array(values.length);
-    for (let index = 0; index < values.length; index += 1) {
-        const value = values[index];
-        const x = xMin + ((times[index] - minTime) / timeSpan) * (xMax - xMin);
-        const normalized = valueSpan < 0.001 ? 0.5 : (value - minYValue) / valueSpan;
-        const y = yMax - normalized * (yMax - yMin);
-        points[index] = [x, y];
+    // Pre-allocate path parts arrays (each point: "L", x, y → 3 slots)
+    const lineCap = 2 + len * 3;          // M x0 y0 + L xi yi * (len-1)
+    const fillCap = 8 + (len - 1) * 3;    // M x0 baseY L x0 y0 + L xi yi * (len-1) + L xN baseY Z
+    const lineParts = new Array(lineCap);
+    const fillParts = new Array(fillCap);
+
+    let li = 0;
+    let fi = 0;
+
+    // First point
+    const tScale = 1 / timeSpan;
+    const vScale = 1 / valueSpan;
+    const baseYs = f1(yMax); // fill baseline = graph bottom
+
+    {
+        const x0 = xMin + (times[0] - minTime) * tScale * xSpan;
+        const y0 = yMax - ((values[0] - minYValue) * vScale) * ySpan;
+        const sx = f1(x0);
+        const sy = f1(y0);
+
+        lineParts[li++] = "M"; lineParts[li++] = sx; lineParts[li++] = sy;
+        fillParts[fi++] = "M"; fillParts[fi++] = sx; fillParts[fi++] = baseYs;
+        fillParts[fi++] = "L"; fillParts[fi++] = sx; fillParts[fi++] = sy;
     }
 
-    const linePath = buildLinePath(points);
-    const fillPath = buildFillPath(points, yMax);
-    forEachEnabledGraphView((view) => {
-        if (view.lineEl) {
-            view.lineEl.setAttribute("d", linePath);
-        }
-        if (view.fillEl) {
-            view.fillEl.setAttribute("d", fillPath);
-        }
-        if (view.errorEl) {
-            view.errorEl.hidden = true;
-            view.errorEl.textContent = "Graph unavailable";
-        }
-    });
+    // Middle points
+    for (let i = 1; i < len; i++) {
+        const x = xMin + (times[i] - minTime) * tScale * xSpan;
+        const y = yMax - ((values[i] - minYValue) * vScale) * ySpan;
+        const sx = f1(x);
+        const sy = f1(y);
 
-    state.graphSeries = {
-        times,
-        values,
-        minTime,
-        maxTime,
-        minYValue,
-        maxYValue,
-    };
+        lineParts[li++] = "L"; lineParts[li++] = sx; lineParts[li++] = sy;
+        fillParts[fi++] = "L"; fillParts[fi++] = sx; fillParts[fi++] = sy;
+    }
 
-    forEachEnabledGraphView((view) => {
-        triggerGraphScanEnter(view);
+    // Close fill path
+    {
+        const xl = xMin + (times[len - 1] - minTime) * tScale * xSpan;
+        const sxl = f1(xl);
+        fillParts[fi++] = "L"; fillParts[fi++] = sxl; fillParts[fi++] = baseYs;
+        fillParts[fi++] = "Z";
+    }
+
+    const linePath = lineParts.join(" ");
+    const fillPath = fillParts.join(" ");
+
+    setGraphLoading(false);
+
+    // Defer SVG DOM update to the next frame so loading state can paint first
+    requestAnimationFrame(() => {
+        forEachEnabledGraphView((view) => {
+            if (view.lineEl) view.lineEl.setAttribute("d", linePath);
+            if (view.fillEl) view.fillEl.setAttribute("d", fillPath);
+            if (view.errorEl) {
+                view.errorEl.hidden = true;
+                view.errorEl.textContent = "Graph unavailable";
+            }
+        });
+
+        state.graphSeries = { times, values, minTime, maxTime, minYValue, maxYValue };
+
+        forEachEnabledGraphView((view) => { triggerGraphScanEnter(view); });
+        redrawPauseMarkers();
+        updateGraphCursor();
     });
-    redrawPauseMarkers();
-    updateGraphCursor();
 
     return true;
 }
