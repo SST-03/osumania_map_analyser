@@ -93,6 +93,9 @@ Note: It is recommended to start with the default settings and then adjust accor
     - **SV Detection**: Whether to enable SV beatmap detection.
         - When enabled, an SV tag will be displayed in the bottom left corner when SV is detected.
         - Note: If the display of beatmap tag capsules is not enabled, the SV tag will not be displayed.
+    - **Pause Detection Threshold**: Set the minimum duration (ms) for a time freeze to be counted as a pause.
+        - A pause is only confirmed when the game time has been frozen for longer than this threshold.
+        - Default is 500ms. If game lag causes false positives, increase this value.
     - **Estimator Algorithm**: Choose the algorithm used for difficulty estimation.
         - Mixed: (Recommended) A hybrid algorithm combining the four below, offering relatively higher accuracy. Automatically selects the algorithm best suited for the current beatmap.
         - Azusa: A hybrid algorithm oriented towards 4K RC, combining the below algorithms with specific adjustments, performing well in RC scenarios but not suitable for LN-dominant beatmaps.
@@ -121,9 +124,6 @@ Note: It is recommended to start with the default settings and then adjust accor
     - **Azusa Sunny Reference Force HO**
         - When enabled, the Azusa algorithm will be forced to treat the beatmap as a pure RC map.
         - It is enabled by default; please do not disable it casually. 
-    - **Pause Detection Threshold**: Set the minimum duration (ms) for a time freeze to be counted as a pause.
-        - A pause is only confirmed when the game time has been frozen for longer than this threshold.
-        - Default is 500ms. If game lag causes false positives, increase this value.
 
 ## Azusa Algorithm Explanation
 This algorithm is a hybrid based on the beatmap itself, combining the results of Daniel and Suuny Rework, with specific adjustments for 4K RC beatmaps. For more details, please refer to [this document](azusa_algorithm.md).
