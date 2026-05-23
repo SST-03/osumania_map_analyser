@@ -16,6 +16,7 @@ import {
     parseEnableEtternaRainbowBarsValue,
     parseEnableStatusMarqueeValue,
     parseEnablePauseDetectionValue,
+    parsePauseDetectionThresholdValue,
     parseEstimatorAlgorithmValue,
     parseAzusaSunnyReferenceHoValue,
     parseEtternaVersionValue,
@@ -573,30 +574,42 @@ export function setupSettingsCommandListener() {
             return;
         }
 
+        // Only apply a setting if it's actually present in the payload.
+        // Otherwise the parser's config.js default would overwrite the
+        // settings.json baseline for settings tosu didn't send.
+        const hasKey = (key) => {
+            if (Array.isArray(payload)) {
+                return payload.some((entry) => entry?.uniqueID === key);
+            }
+            return Object.prototype.hasOwnProperty.call(payload, key);
+        };
+        const applyIf = (key, applyFn, parseResult) =>
+            hasKey(key) ? applyFn(parseResult) : false;
+
         state.settingsReceivedFromCommand = true;
-        const wsEndpointChanged = applyWsEndpointSetting(parseWsEndpointValue(payload));
-        const contentBarChanged = applyContentBarSetting(parseContentBarValue(payload));
-        const srTextChanged = applySrTextSetting(parseSrTextValue(payload));
-        const debugChanged = applyDebugUseAmountSetting(parseDebugUseAmountValue(payload));
-        const diffTextChanged = applyDiffTextSetting(parseDiffTextValue(payload));
-        const estimatorChanged = applyEstimatorAlgorithmSetting(parseEstimatorAlgorithmValue(payload));
-        const azusaSunnyReferenceHoChanged = applyAzusaSunnyReferenceHoSetting(parseAzusaSunnyReferenceHoValue(payload));
-        const etternaVersionChanged = applyEtternaVersionSetting(parseEtternaVersionValue(payload));
-        const companellaEtternaVersionChanged = applyCompanellaEtternaVersionSetting(parseCompanellaEtternaVersionValue(payload));
-        const pauseChanged = applyPauseDetectionSetting(parseEnablePauseDetectionValue(payload));
-        const pauseThresholdChanged = applyPauseDetectionThresholdSetting(parsePauseDetectionThresholdValue(payload));
-        const rainbowChanged = applyEnableEtternaRainbowBarsSetting(parseEnableEtternaRainbowBarsValue(payload));
-        const statusMarqueeChanged = applyEnableStatusMarqueeSetting(parseEnableStatusMarqueeValue(payload));
-        const vibroChanged = applyVibroDetectionSetting(parseVibroDetectionValue(payload));
-        const modeTagVisibilityChanged = applyShowModeTagCapsuleSetting(parseShowModeTagCapsuleValue(payload));
-        const numericDifficultyChanged = applyEnableNumericDifficultySetting(parseEnableNumericDifficultyValue(payload));
-        const hideCardDuringPlayChanged = applyHideCardDuringPlaySetting(parseHideCardDuringPlayValue(payload));
-        const cardOpacityChanged = applyCardOpacitySetting(parseCardOpacityValue(payload));
-        const cardBlurChanged = applyCardBlurSetting(parseCardBlurValue(payload));
-        const cardRadiusChanged = applyCardRadiusSetting(parseCardRadiusValue(payload));
-        const enableUpdateCheckChanged = applyEnableUpdateCheckSetting(parseEnableUpdateCheckValue(payload));
-        const reverseCardDirectionChanged = applyReverseCardExtendDirectionSetting(parseReverseCardExtendDirectionValue(payload));
-        const svChanged = applyUseSvDetectionSetting(parseSvDetectionValue(payload));
+        const wsEndpointChanged = applyIf("wsEndpoint", applyWsEndpointSetting, parseWsEndpointValue(payload));
+        const contentBarChanged = applyIf("contentBar", applyContentBarSetting, parseContentBarValue(payload));
+        const srTextChanged = applyIf("srText", applySrTextSetting, parseSrTextValue(payload));
+        const debugChanged = applyIf("debugUseAmount", applyDebugUseAmountSetting, parseDebugUseAmountValue(payload));
+        const diffTextChanged = applyIf("diffText", applyDiffTextSetting, parseDiffTextValue(payload));
+        const estimatorChanged = applyIf("estimatorAlgorithm", applyEstimatorAlgorithmSetting, parseEstimatorAlgorithmValue(payload));
+        const azusaSunnyReferenceHoChanged = applyIf("azusaSunnyReferenceHo", applyAzusaSunnyReferenceHoSetting, parseAzusaSunnyReferenceHoValue(payload));
+        const etternaVersionChanged = applyIf("etternaVersion", applyEtternaVersionSetting, parseEtternaVersionValue(payload));
+        const companellaEtternaVersionChanged = applyIf("companellaEtternaVersion", applyCompanellaEtternaVersionSetting, parseCompanellaEtternaVersionValue(payload));
+        const pauseChanged = applyIf("enablePauseDetection", applyPauseDetectionSetting, parseEnablePauseDetectionValue(payload));
+        const pauseThresholdChanged = applyIf("pauseDetectionThreshold", applyPauseDetectionThresholdSetting, parsePauseDetectionThresholdValue(payload));
+        const rainbowChanged = applyIf("enableEtternaRainbowBars", applyEnableEtternaRainbowBarsSetting, parseEnableEtternaRainbowBarsValue(payload));
+        const statusMarqueeChanged = applyIf("enableStatusMarquee", applyEnableStatusMarqueeSetting, parseEnableStatusMarqueeValue(payload));
+        const vibroChanged = applyIf("VibroDetection", applyVibroDetectionSetting, parseVibroDetectionValue(payload));
+        const modeTagVisibilityChanged = applyIf("showModeTagCapsule", applyShowModeTagCapsuleSetting, parseShowModeTagCapsuleValue(payload));
+        const numericDifficultyChanged = applyIf("enableNumericDifficulty", applyEnableNumericDifficultySetting, parseEnableNumericDifficultyValue(payload));
+        const hideCardDuringPlayChanged = applyIf("hideCardDuringPlay", applyHideCardDuringPlaySetting, parseHideCardDuringPlayValue(payload));
+        const cardOpacityChanged = applyIf("cardOpacity", applyCardOpacitySetting, parseCardOpacityValue(payload));
+        const cardBlurChanged = applyIf("cardBlur", applyCardBlurSetting, parseCardBlurValue(payload));
+        const cardRadiusChanged = applyIf("cardRadius", applyCardRadiusSetting, parseCardRadiusValue(payload));
+        const enableUpdateCheckChanged = applyIf("enableUpdateCheck", applyEnableUpdateCheckSetting, parseEnableUpdateCheckValue(payload));
+        const reverseCardDirectionChanged = applyIf("reverseCardExtendDirection", applyReverseCardExtendDirectionSetting, parseReverseCardExtendDirectionValue(payload));
+        const svChanged = applyIf("useSvDetection", applyUseSvDetectionSetting, parseSvDetectionValue(payload));
 
         const legacyAutoMode = parseAutoModeValue(payload);
         if (legacyAutoMode && !isAutoDisplayEnabled()) {
@@ -684,74 +697,83 @@ function waitForInitialSettingsFromCommand(timeoutMs) {
 }
 
 export async function loadSettings() {
-    setupSettingsCommandListener();
-
-    try {
-        await waitForInitialSettingsFromCommand(SETTINGS_COMMAND_TIMEOUT_MS);
-        return;
-    } catch {
-        // Fall back to local settings file fetch when command channel is unavailable.
-    }
-
+    // Always load settings.json first as baseline.
+    // The command channel may not include every setting; settings.json fills the gaps.
+    let fileSettings = null;
     try {
         const response = await fetch("./settings.json", {
             method: "GET",
             cache: "no-store",
         });
-
-        if (!response.ok) {
-            throw new Error(`settings.json status ${response.status}`);
+        if (response.ok) {
+            fileSettings = await response.json();
         }
-
-        const settings = await response.json();
-        applyWsEndpointSetting(parseWsEndpointValue(settings));
-        applyContentBarSetting(parseContentBarValue(settings));
-        applySrTextSetting(parseSrTextValue(settings));
-        applyDebugUseAmountSetting(parseDebugUseAmountValue(settings));
-        applyDiffTextSetting(parseDiffTextValue(settings));
-        applyEstimatorAlgorithmSetting(parseEstimatorAlgorithmValue(settings));
-        applyAzusaSunnyReferenceHoSetting(parseAzusaSunnyReferenceHoValue(settings));
-        applyEtternaVersionSetting(parseEtternaVersionValue(settings));
-        applyCompanellaEtternaVersionSetting(parseCompanellaEtternaVersionValue(settings));
-        applyPauseDetectionSetting(parseEnablePauseDetectionValue(settings));
-        applyPauseDetectionThresholdSetting(parsePauseDetectionThresholdValue(settings));
-        applyEnableEtternaRainbowBarsSetting(parseEnableEtternaRainbowBarsValue(settings));
-        applyEnableStatusMarqueeSetting(parseEnableStatusMarqueeValue(settings));
-        applyVibroDetectionSetting(parseVibroDetectionValue(settings));
-        applyShowModeTagCapsuleSetting(parseShowModeTagCapsuleValue(settings));
-        applyEnableNumericDifficultySetting(parseEnableNumericDifficultyValue(settings));
-        applyHideCardDuringPlaySetting(parseHideCardDuringPlayValue(settings));
-        applyCardOpacitySetting(parseCardOpacityValue(settings));
-        applyCardBlurSetting(parseCardBlurValue(settings));
-        applyCardRadiusSetting(parseCardRadiusValue(settings));
-        applyEnableUpdateCheckSetting(parseEnableUpdateCheckValue(settings));
-        applyReverseCardExtendDirectionSetting(parseReverseCardExtendDirectionValue(settings));
-        applyUseSvDetectionSetting(parseSvDetectionValue(settings));
     } catch {
-        applyWsEndpointSetting(APP_CONFIG.defaults.wsEndpoint || APP_CONFIG.socketHost);
-        applyContentBarSetting(APP_CONFIG.defaults.contentBar);
-        applySrTextSetting(APP_CONFIG.defaults.srText);
-        applyDebugUseAmountSetting(APP_CONFIG.defaults.debugUseAmount);
-        applyDiffTextSetting(APP_CONFIG.defaults.diffText);
-        applyEstimatorAlgorithmSetting(APP_CONFIG.defaults.estimatorAlgorithm);
-        applyAzusaSunnyReferenceHoSetting(APP_CONFIG.defaults.azusaSunnyReferenceHo);
-        applyEtternaVersionSetting(APP_CONFIG.defaults.etternaVersion);
-        applyCompanellaEtternaVersionSetting(APP_CONFIG.defaults.companellaEtternaVersion);
-        applyPauseDetectionSetting(APP_CONFIG.defaults.pauseDetectionEnabled);
-        applyPauseDetectionThresholdSetting(APP_CONFIG.defaults.pauseDetectionThresholdMs);
-        applyEnableEtternaRainbowBarsSetting(APP_CONFIG.defaults.enableEtternaRainbowBars);
-        applyEnableStatusMarqueeSetting(APP_CONFIG.defaults.enableStatusMarquee);
-        applyVibroDetectionSetting(APP_CONFIG.defaults.vibroDetection);
-        applyShowModeTagCapsuleSetting(APP_CONFIG.defaults.showModeTagCapsule);
-        applyEnableNumericDifficultySetting(APP_CONFIG.defaults.enableNumericDifficulty);
-        applyHideCardDuringPlaySetting(APP_CONFIG.defaults.hideCardDuringPlay);
-        applyCardOpacitySetting(APP_CONFIG.defaults.cardOpacity);
-        applyCardBlurSetting(APP_CONFIG.defaults.cardBlur);
-        applyCardRadiusSetting(APP_CONFIG.defaults.cardRadius);
-        applyEnableUpdateCheckSetting(APP_CONFIG.defaults.enableUpdateCheck);
-        applyReverseCardExtendDirectionSetting(APP_CONFIG.defaults.reverseCardExtendDirection);
-        applyUseSvDetectionSetting(APP_CONFIG.defaults.useSvDetection);
+        fileSettings = null;
     }
+
+    function applySettingsFrom(source) {
+        applyWsEndpointSetting(parseWsEndpointValue(source));
+        applyContentBarSetting(parseContentBarValue(source));
+        applySrTextSetting(parseSrTextValue(source));
+        applyDebugUseAmountSetting(parseDebugUseAmountValue(source));
+        applyDiffTextSetting(parseDiffTextValue(source));
+        applyEstimatorAlgorithmSetting(parseEstimatorAlgorithmValue(source));
+        applyAzusaSunnyReferenceHoSetting(parseAzusaSunnyReferenceHoValue(source));
+        applyEtternaVersionSetting(parseEtternaVersionValue(source));
+        applyCompanellaEtternaVersionSetting(parseCompanellaEtternaVersionValue(source));
+        applyPauseDetectionSetting(parseEnablePauseDetectionValue(source));
+        applyPauseDetectionThresholdSetting(parsePauseDetectionThresholdValue(source));
+        applyEnableEtternaRainbowBarsSetting(parseEnableEtternaRainbowBarsValue(source));
+        applyEnableStatusMarqueeSetting(parseEnableStatusMarqueeValue(source));
+        applyVibroDetectionSetting(parseVibroDetectionValue(source));
+        applyShowModeTagCapsuleSetting(parseShowModeTagCapsuleValue(source));
+        applyEnableNumericDifficultySetting(parseEnableNumericDifficultyValue(source));
+        applyHideCardDuringPlaySetting(parseHideCardDuringPlayValue(source));
+        applyCardOpacitySetting(parseCardOpacityValue(source));
+        applyCardBlurSetting(parseCardBlurValue(source));
+        applyCardRadiusSetting(parseCardRadiusValue(source));
+        applyEnableUpdateCheckSetting(parseEnableUpdateCheckValue(source));
+        applyReverseCardExtendDirectionSetting(parseReverseCardExtendDirectionValue(source));
+        applyUseSvDetectionSetting(parseSvDetectionValue(source));
+    }
+
+    // Apply file settings as baseline immediately
+    if (fileSettings) {
+        applySettingsFrom(fileSettings);
+    } else {
+        // File unavailable — apply config defaults as fallback
+        applySettingsFrom({
+            wsEndpoint: APP_CONFIG.defaults.wsEndpoint || APP_CONFIG.socketHost,
+            contentBar: APP_CONFIG.defaults.contentBar,
+            srText: APP_CONFIG.defaults.srText,
+            debugUseAmount: APP_CONFIG.defaults.debugUseAmount,
+            diffText: APP_CONFIG.defaults.diffText,
+            estimatorAlgorithm: APP_CONFIG.defaults.estimatorAlgorithm,
+            azusaSunnyReferenceHo: APP_CONFIG.defaults.azusaSunnyReferenceHo,
+            etternaVersion: APP_CONFIG.defaults.etternaVersion,
+            companellaEtternaVersion: APP_CONFIG.defaults.companellaEtternaVersion,
+            enablePauseDetection: APP_CONFIG.defaults.pauseDetectionEnabled,
+            pauseDetectionThreshold: APP_CONFIG.defaults.pauseDetectionThresholdMs,
+            enableEtternaRainbowBars: APP_CONFIG.defaults.enableEtternaRainbowBars,
+            enableStatusMarquee: APP_CONFIG.defaults.enableStatusMarquee,
+            VibroDetection: APP_CONFIG.defaults.vibroDetection,
+            showModeTagCapsule: APP_CONFIG.defaults.showModeTagCapsule,
+            enableNumericDifficulty: APP_CONFIG.defaults.enableNumericDifficulty,
+            hideCardDuringPlay: APP_CONFIG.defaults.hideCardDuringPlay,
+            cardOpacity: APP_CONFIG.defaults.cardOpacity,
+            cardBlur: APP_CONFIG.defaults.cardBlur,
+            cardRadius: APP_CONFIG.defaults.cardRadius,
+            enableUpdateCheck: APP_CONFIG.defaults.enableUpdateCheck,
+            reverseCardExtendDirection: APP_CONFIG.defaults.reverseCardExtendDirection,
+            useSvDetection: APP_CONFIG.defaults.useSvDetection,
+        });
+    }
+
+    // Register command listener for live settings updates (user changes in tosu UI).
+    // The listener is set up after file baseline so command callbacks don't
+    // overwrite file values with config defaults for settings tosu doesn't send.
+    setupSettingsCommandListener();
 }
 
 export function currentUseDanielAlgorithm() {
