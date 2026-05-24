@@ -561,7 +561,7 @@ bid,name,pattern,subPattern,expected,got,delta,deltaAbs
 4704824,M-A[impossible jack](wllk2) x0.85,jack,mid chordjack,13.9,13.84,0.06,0.06
 5561111,manual of youth(tsumikiyuzu) x1.3,jack,mid chordjack,14,14.10,-0.10,0.10
 3476973,Don't Stop The Music(rg7v3),jack,mid chordjack,6.7,6.71,-0.01,0.01
-4262735,oddloop(teradora),speed,mid stream,12.2,14.26,-2.06,2.06
+4262736,oddloop(teradora),speed,mid stream,12.2,12.17,0.03,0.03
 4670616,Toromi Hearts 2(rachel),speed,mid stream,14.6,14.67,-0.07,0.07
 3163355,Palette(rachel) x1.2,speed,mid stream,14.6,14.66,-0.06,0.06
 1631150,Green-Eyed Jealousy[True End](rachel),speed,mid stream,14.6,14.82,-0.22,0.22
