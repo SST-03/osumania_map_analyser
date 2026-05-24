@@ -33,11 +33,10 @@ This repository is an in-game overlay (pp counter) for [tosu](https://tosu.app),
 ## Notes
 1. The plugin needs to run in the `static` directory of tosu. Ensure it is placed directly in that directory, not nested inside another folder.
 2. This plugin relies on the correct parsing of beatmap data. Certain special or non-standard beatmaps may lead to inaccurate analysis results.
-3. The pause detection feature includes a threshold mechanism (default 500ms), which can be adjusted in settings. If game lag causes false positives, consider increasing the threshold.
-4. The SV detection feature is experimental and may have a high rate of false positives; use it with caution.
-5. Although the difficulty estimation algorithms have been tuned, inaccuracies may still exist; please use them only as a reference. For 4K, high difficulties are generally more accurate with an overall error of no more than half a Dan, while low difficulties may be less accurate; in specific patterns like Minijack, Stamina, and Anchor, the estimation results may have larger deviations. For 6K and 7K, the overall performance is relatively average. It is recommended that players combine the estimation results with their actual gameplay experience for judgment and not rely too heavily on the estimates.
-6. The plugin's performance may be affected by the complexity of the beatmap and the features selected; in some cases, lag or delays may occur. Please adjust the settings according to your actual situation for a better experience.
-7. If you encounter any issues, feel free to submit an issue.
+3. If game lag causes false positives, consider increasing the pause detection threshold.
+4. Although the difficulty estimation algorithms have been tuned, inaccuracies may still exist; please use them only as a reference. For 4K, high difficulties are generally more accurate with an overall error of no more than half a Dan, while low difficulties may be less accurate; in specific patterns like Minijack, Stamina, and Anchor, the estimation results may have larger deviations. For 6K and 7K, the overall performance is relatively average. It is recommended that players combine the estimation results with their actual gameplay experience for judgment and not rely too heavily on the estimates.
+5. The plugin's performance may be affected by the complexity of the beatmap and the features selected; in some cases, lag or delays may occur. Please adjust the settings according to your actual situation for a better experience.
+6. If you encounter any issues, feel free to submit an issue.
 
 ## Settings
 Note: It is recommended to start with the default settings and then adjust according to personal preference.
