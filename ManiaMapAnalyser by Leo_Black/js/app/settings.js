@@ -7,7 +7,6 @@ import {
     hasAnyGraphModeEnabled,
     mainCardEl,
     parseAutoModeValue,
-    parseCardBlurValue,
     parseCardOpacityValue,
     parseCardRadiusValue,
     parseContentBarValue,
@@ -39,7 +38,6 @@ import {
 } from "./appContext.js";
 import {
     normalizeBooleanSetting,
-    normalizeCardBlurValue,
     normalizeCardOpacityValue,
     normalizeCardRadiusValue,
     normalizeContentBarValue,
@@ -171,11 +169,6 @@ function applyVisualStyleSettings() {
         "80%": "0.8",
         "70%": "0.7",
     };
-    const blurMap = {
-        Off: "0px",
-        Soft: "6px",
-        Strong: "12px",
-    };
     const radiusMap = {
         Small: "12px",
         Medium: "16px",
@@ -183,13 +176,11 @@ function applyVisualStyleSettings() {
     };
 
     const opacity = opacityMap[state.cardOpacity] || opacityMap[APP_CONFIG.defaults.cardOpacity] || "0.95";
-    const blur = blurMap[state.cardBlur] || blurMap[APP_CONFIG.defaults.cardBlur] || "6px";
     const radius = radiusMap[state.cardRadius] || radiusMap[APP_CONFIG.defaults.cardRadius] || "16px";
     const shouldShowUpdateIcon = Boolean(state.enableUpdateCheck && state.hasAvailableUpdate);
 
     if (mainCardEl) {
         mainCardEl.style.setProperty("--card-opacity", opacity);
-        mainCardEl.style.setProperty("--card-backdrop-blur", blur);
         mainCardEl.style.setProperty("--card-radius", radius);
         mainCardEl.style.setProperty("--card-extend-origin", state.reverseCardExtendDirection ? "bottom" : "top");
         mainCardEl.classList.toggle("hide-title-icon", !shouldShowUpdateIcon);
@@ -508,14 +499,6 @@ export function applyCardOpacitySetting(value) {
     return changed;
 }
 
-export function applyCardBlurSetting(value) {
-    const next = normalizeCardBlurValue(value) || APP_CONFIG.defaults.cardBlur;
-    const changed = state.cardBlur !== next;
-    state.cardBlur = next;
-    applyVisualStyleSettings();
-    return changed;
-}
-
 export function applyCardRadiusSetting(value) {
     const next = normalizeCardRadiusValue(value) || APP_CONFIG.defaults.cardRadius;
     const changed = state.cardRadius !== next;
@@ -605,7 +588,6 @@ export function setupSettingsCommandListener() {
         const numericDifficultyChanged = applyIf("enableNumericDifficulty", applyEnableNumericDifficultySetting, parseEnableNumericDifficultyValue(payload));
         const hideCardDuringPlayChanged = applyIf("hideCardDuringPlay", applyHideCardDuringPlaySetting, parseHideCardDuringPlayValue(payload));
         const cardOpacityChanged = applyIf("cardOpacity", applyCardOpacitySetting, parseCardOpacityValue(payload));
-        const cardBlurChanged = applyIf("cardBlur", applyCardBlurSetting, parseCardBlurValue(payload));
         const cardRadiusChanged = applyIf("cardRadius", applyCardRadiusSetting, parseCardRadiusValue(payload));
         const enableUpdateCheckChanged = applyIf("enableUpdateCheck", applyEnableUpdateCheckSetting, parseEnableUpdateCheckValue(payload));
         const reverseCardDirectionChanged = applyIf("reverseCardExtendDirection", applyReverseCardExtendDirectionSetting, parseReverseCardExtendDirectionValue(payload));
@@ -636,7 +618,6 @@ export function setupSettingsCommandListener() {
             || numericDifficultyChanged
             || hideCardDuringPlayChanged
             || cardOpacityChanged
-            || cardBlurChanged
             || cardRadiusChanged
             || enableUpdateCheckChanged
             || reverseCardDirectionChanged
@@ -731,7 +712,6 @@ export async function loadSettings() {
         applyEnableNumericDifficultySetting(parseEnableNumericDifficultyValue(source));
         applyHideCardDuringPlaySetting(parseHideCardDuringPlayValue(source));
         applyCardOpacitySetting(parseCardOpacityValue(source));
-        applyCardBlurSetting(parseCardBlurValue(source));
         applyCardRadiusSetting(parseCardRadiusValue(source));
         applyEnableUpdateCheckSetting(parseEnableUpdateCheckValue(source));
         applyReverseCardExtendDirectionSetting(parseReverseCardExtendDirectionValue(source));
@@ -762,7 +742,6 @@ export async function loadSettings() {
             enableNumericDifficulty: APP_CONFIG.defaults.enableNumericDifficulty,
             hideCardDuringPlay: APP_CONFIG.defaults.hideCardDuringPlay,
             cardOpacity: APP_CONFIG.defaults.cardOpacity,
-            cardBlur: APP_CONFIG.defaults.cardBlur,
             cardRadius: APP_CONFIG.defaults.cardRadius,
             enableUpdateCheck: APP_CONFIG.defaults.enableUpdateCheck,
             reverseCardExtendDirection: APP_CONFIG.defaults.reverseCardExtendDirection,

@@ -28,6 +28,7 @@ import {
 import { updateCardPlayVisibility } from "./hud.js";
 import { scheduleRecompute } from "./scheduler.js";
 import { getCounterPathForCommand } from "./settings.js";
+import { applyCoverThemeForBeatmap } from "./coverTheme.js";
 
 
 function getModData(data) {
@@ -246,6 +247,12 @@ export function setupSocketListener() {
         state.lastBeatmapIdentitySource = identityParts.length > 1
             ? "composite"
             : (identityParts[0]?.split(":")[0] || "");
+
+        // 仅在谱面本身（非单纯改 mod）发生变化时，重新取封面主色刷新主题。
+        // 取色异步进行、失败自动退默认，绝不阻塞分析流程。
+        if (nextBeatmapIdentity !== previousBeatmapIdentity) {
+            applyCoverThemeForBeatmap(nextBeatmapIdentity).catch(() => {});
+        }
         const key = `${nextBeatmapIdentity}|${nextModSignature}`;
         resetPauseRuntime(true);
         state.lastBeatmapKey = key;

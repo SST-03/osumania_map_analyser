@@ -98,18 +98,6 @@
 		"value": "95%"
 	},
 	{
-		"uniqueID": "cardBlur",
-		"type": "options",
-		"title": "Card Blur",
-		"description": "Set card background blur strength.",
-		"options": [
-			"Off",
-			"Soft",
-			"Strong"
-		],
-		"value": "Soft"
-	},
-	{
 		"uniqueID": "cardRadius",
 		"type": "options",
 		"title": "Card Radius",

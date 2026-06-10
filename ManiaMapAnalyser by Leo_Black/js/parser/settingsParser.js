@@ -89,18 +89,6 @@ export function normalizeCardOpacityValue(value) {
     return `${clamped}%`;
 }
 
-export function normalizeCardBlurValue(value) {
-    if (typeof value !== "string") {
-        return null;
-    }
-
-    const lowered = value.trim().toLowerCase();
-    if (lowered === "off") return "Off";
-    if (lowered === "soft") return "Soft";
-    if (lowered === "strong") return "Strong";
-    return null;
-}
-
 export function normalizeCardRadiusValue(value) {
     if (typeof value !== "string") {
         return null;
@@ -201,7 +189,6 @@ export function createSettingsParsers(appConfig) {
         appConfig?.options?.companellaEtternaVersion || appConfig?.options?.etternaVersion,
     );
     const cardOpacitySet = createSet(appConfig?.options?.cardOpacity);
-    const cardBlurSet = createSet(appConfig?.options?.cardBlur);
     const cardRadiusSet = createSet(appConfig?.options?.cardRadius);
 
     function parseEnablePatternValue(settingsPayload) {
@@ -393,21 +380,6 @@ export function createSettingsParsers(appConfig) {
         return appConfig.defaults.cardOpacity;
     }
 
-    function parseCardBlurValue(settingsPayload) {
-        const value = extractSettingValue(settingsPayload, "cardBlur");
-        const normalized = normalizeCardBlurValue(value);
-        if (normalized && cardBlurSet.has(normalized.toLowerCase())) {
-            return normalized;
-        }
-
-        const fallback = normalizeCardBlurValue(appConfig.defaults.cardBlur);
-        if (fallback && cardBlurSet.has(fallback.toLowerCase())) {
-            return fallback;
-        }
-
-        return appConfig.defaults.cardBlur;
-    }
-
     function parseCardRadiusValue(settingsPayload) {
         const value = extractSettingValue(settingsPayload, "cardRadius");
         const normalized = normalizeCardRadiusValue(value);
@@ -492,7 +464,6 @@ export function createSettingsParsers(appConfig) {
         parseEnableNumericDifficultyValue,
         parseHideCardDuringPlayValue,
         parseCardOpacityValue,
-        parseCardBlurValue,
         parseCardRadiusValue,
         parseEnableUpdateCheckValue,
         parseReverseCardExtendDirectionValue,
