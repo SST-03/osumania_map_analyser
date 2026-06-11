@@ -212,3 +212,24 @@
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
     animation: shimmer 1.2s infinite;
 }
+
+/* 换难度 / 改设置时（bars-live）：行不再逐条弹入，填充也不重放 scaleX 弹出，
+   而是让宽度像进度条一样横向平滑过渡到新值。换歌时不加 bars-live，照旧整组入场。 */
+.cluster-bars.bars-live .cluster-item,
+.ett-skill-bars.bars-live .ett-skill-item {
+    opacity: 1;
+    transform: none;
+    animation: none;
+}
+
+.cluster-bars.bars-live .cluster-fill,
+.ett-skill-bars.bars-live .ett-skill-fill {
+    transform: none;
+    animation: none;
+    transition: width 420ms cubic-bezier(0.2, 0.92, 0.28, 1),
+        background-position 420ms cubic-bezier(0.2, 0.92, 0.28, 1);
+}
+
+.ett-skill-bars.bars-live .ett-skill-head {
+    transition: left 420ms cubic-bezier(0.2, 0.92, 0.28, 1);
+}

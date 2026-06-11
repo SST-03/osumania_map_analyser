@@ -12,6 +12,7 @@ export function normalizeContentBarValue(value) {
     if (lowered === "pattern") return "Pattern";
     if (lowered === "etterna") return "Etterna";
     if (lowered === "graph") return "Graph";
+    if (lowered === "full") return "Full";
     if (lowered === "none") return "None";
     return null;
 }
@@ -89,18 +90,6 @@ export function normalizeCardOpacityValue(value) {
     return `${clamped}%`;
 }
 
-export function normalizeCardBlurValue(value) {
-    if (typeof value !== "string") {
-        return null;
-    }
-
-    const lowered = value.trim().toLowerCase();
-    if (lowered === "off") return "Off";
-    if (lowered === "soft") return "Soft";
-    if (lowered === "strong") return "Strong";
-    return null;
-}
-
 export function normalizeCardRadiusValue(value) {
     if (typeof value !== "string") {
         return null;
@@ -111,6 +100,43 @@ export function normalizeCardRadiusValue(value) {
     if (lowered === "medium") return "Medium";
     if (lowered === "large") return "Large";
     return null;
+}
+
+// Background blur strength for the Pattern/Etterna/Graph cover layers. Accepts a
+// number (px), a "<n>px"/"<n>" string, or "Off"/"None" → "Off". Anything else
+// returns null so callers fall back to the configured default.
+export function normalizeCardBgBlurValue(value) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        const clamped = Math.max(0, Math.min(40, Math.round(value)));
+        return clamped === 0 ? "Off" : `${clamped}px`;
+    }
+
+    if (typeof value !== "string") {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    const lowered = trimmed.toLowerCase();
+    if (lowered === "off" || lowered === "none" || lowered === "0" || lowered === "0px") {
+        return "Off";
+    }
+
+    const match = trimmed.match(/^(\d{1,3})(px)?$/i);
+    if (!match) {
+        return null;
+    }
+
+    const numeric = Number.parseInt(match[1], 10);
+    if (!Number.isFinite(numeric)) {
+        return null;
+    }
+
+    const clamped = Math.max(0, Math.min(40, numeric));
+    return clamped === 0 ? "Off" : `${clamped}px`;
 }
 
 export function normalizeWsEndpointValue(value, fallback = "localhost:24050") {
@@ -169,6 +195,18 @@ export function normalizeBooleanSetting(value, fallback = false) {
     return Boolean(value);
 }
 
+export function normalizeCustomBackgroundColorValue(value) {
+    if (typeof value !== "string") {
+        return null;
+    }
+
+    if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+        return value.toLowerCase();
+    }
+
+    return null;
+}
+
 export function extractSettingValue(settingsPayload, settingKey) {
     if (Array.isArray(settingsPayload)) {
         const item = settingsPayload.find((entry) => entry?.uniqueID === settingKey);
@@ -201,8 +239,8 @@ export function createSettingsParsers(appConfig) {
         appConfig?.options?.companellaEtternaVersion || appConfig?.options?.etternaVersion,
     );
     const cardOpacitySet = createSet(appConfig?.options?.cardOpacity);
-    const cardBlurSet = createSet(appConfig?.options?.cardBlur);
     const cardRadiusSet = createSet(appConfig?.options?.cardRadius);
+    const cardBgBlurSet = createSet(appConfig?.options?.cardBgBlur);
 
     function parseEnablePatternValue(settingsPayload) {
         if (Array.isArray(settingsPayload)) {
@@ -378,6 +416,27 @@ export function createSettingsParsers(appConfig) {
         return normalizeBooleanSetting(value, appConfig.defaults.hideCardDuringPlay);
     }
 
+    function parseEnableOsuThemeValue(settingsPayload) {
+        const value = extractSettingValue(settingsPayload, "enableOsuTheme");
+        return normalizeBooleanSetting(value, appConfig.defaults.enableOsuTheme);
+    }
+
+    function parseEnableFloatingTrianglesValue(settingsPayload) {
+        const value = extractSettingValue(settingsPayload, "enableFloatingTriangles");
+        return normalizeBooleanSetting(value, appConfig.defaults.enableFloatingTriangles);
+    }
+
+    function parseEnableCoverArtValue(settingsPayload) {
+        const value = extractSettingValue(settingsPayload, "enableCoverArt");
+        return normalizeBooleanSetting(value, appConfig.defaults.enableCoverArt);
+    }
+
+    function parseCustomBackgroundColorValue(settingsPayload) {
+        const value = extractSettingValue(settingsPayload, "customBackgroundColor");
+        const normalized = normalizeCustomBackgroundColorValue(value);
+        return normalized ?? "#000000";
+    }
+
     function parseCardOpacityValue(settingsPayload) {
         const value = extractSettingValue(settingsPayload, "cardOpacity");
         const normalized = normalizeCardOpacityValue(value);
@@ -393,21 +452,6 @@ export function createSettingsParsers(appConfig) {
         return appConfig.defaults.cardOpacity;
     }
 
-    function parseCardBlurValue(settingsPayload) {
-        const value = extractSettingValue(settingsPayload, "cardBlur");
-        const normalized = normalizeCardBlurValue(value);
-        if (normalized && cardBlurSet.has(normalized.toLowerCase())) {
-            return normalized;
-        }
-
-        const fallback = normalizeCardBlurValue(appConfig.defaults.cardBlur);
-        if (fallback && cardBlurSet.has(fallback.toLowerCase())) {
-            return fallback;
-        }
-
-        return appConfig.defaults.cardBlur;
-    }
-
     function parseCardRadiusValue(settingsPayload) {
         const value = extractSettingValue(settingsPayload, "cardRadius");
         const normalized = normalizeCardRadiusValue(value);
@@ -421,6 +465,21 @@ export function createSettingsParsers(appConfig) {
         }
 
         return appConfig.defaults.cardRadius;
+    }
+
+    function parseCardBgBlurValue(settingsPayload) {
+        const value = extractSettingValue(settingsPayload, "cardBgBlur");
+        const normalized = normalizeCardBgBlurValue(value);
+        if (normalized && cardBgBlurSet.has(normalized.toLowerCase())) {
+            return normalized;
+        }
+
+        const fallback = normalizeCardBgBlurValue(appConfig.defaults.cardBgBlur);
+        if (fallback && cardBgBlurSet.has(fallback.toLowerCase())) {
+            return fallback;
+        }
+
+        return appConfig.defaults.cardBgBlur;
     }
 
     function parseEnableUpdateCheckValue(settingsPayload) {
@@ -491,9 +550,13 @@ export function createSettingsParsers(appConfig) {
         parseShowModeTagCapsuleValue,
         parseEnableNumericDifficultyValue,
         parseHideCardDuringPlayValue,
+        parseEnableOsuThemeValue,
+        parseEnableFloatingTrianglesValue,
+        parseEnableCoverArtValue,
+        parseCustomBackgroundColorValue,
         parseCardOpacityValue,
-        parseCardBlurValue,
         parseCardRadiusValue,
+        parseCardBgBlurValue,
         parseEnableUpdateCheckValue,
         parseReverseCardExtendDirectionValue,
         parseSvDetectionValue,

@@ -8,10 +8,12 @@ import {
 import { setRecomputeHandler, scheduleRecompute } from "./scheduler.js";
 import { loadSettings } from "./settings.js";
 import { setupSocketListener } from "./socketHandlers.js";
+import { initTriangleField } from "./triangles.js";
 
 setRecomputeHandler(fetchBeatmapFile);
 
 export async function initialize() {
+    initTriangleField();
     await loadSettings();
     updateModeTagVisibility();
     updatePauseCountVisibility();

@@ -166,3 +166,49 @@
         transform: translateY(0);
     }
 }
+
+/* 换歌：难度名从右侧横向滑入，方向上区别于换难度的纵向轻弹。 */
+@keyframes song-swap {
+    0% {
+        opacity: 0;
+        transform: translateX(22px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* 换歌：整个 star 区块淡入 + 上移 + 轻微放大，给出明显的“新歌”入场。 */
+@keyframes song-enter {
+    0% {
+        opacity: 0;
+        transform: translateY(12px) scale(0.985);
+    }
+    60% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* 换难度：图表只做整体交叉淡入，不做左→右扫描，区别于换歌。 */
+@keyframes graph-soft-reveal-line {
+    from {
+        opacity: 0.15;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes graph-soft-reveal-fill {
+    from {
+        opacity: 0.06;
+    }
+    to {
+        opacity: 1;
+    }
+}

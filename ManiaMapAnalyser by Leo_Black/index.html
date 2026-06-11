@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="ma-theme-osu ma-fx-triangles ma-fx-cover">
 
 <head>
     <title>MapAnalysis</title>
@@ -12,6 +12,7 @@
 <body>
     <main class="dashboard">
         <section class="card main-card">
+            <div class="triangle-field" aria-hidden="true"></div>
             <div class="status-row">
                 <span class="title-icon" aria-hidden="true" hidden>
                     <svg viewBox="0 0 24 24" role="img" focusable="false">
@@ -26,6 +27,7 @@
                     <div class="star-value" id="rework-star">-</div>
                     <div class="star-meta" id="rework-meta">LN%: -<br/>Keys: -</div>
                 </div>
+                <div class="star-right-group">
                 <div class="star-right">
                     <div class="top-right-capsule" id="rework-right-capsule" hidden>-</div>
                     <div class="star-subtitle" id="rework-diff">-</div>
@@ -41,16 +43,27 @@
                     </div>
                     <div class="star-caption" id="est-diff-caption">Estimate Difficulty</div>
                 </div>
+                <div class="star-tip" id="star-tip" hidden>
+                    <span class="star-dot" data-level="5"></span>
+                    <span class="star-dot" data-level="4"></span>
+                    <span class="star-dot" data-level="3"></span>
+                    <span class="star-dot" data-level="2"></span>
+                    <span class="star-dot" data-level="1"></span>
+                </div>
+                </div>
             </div>
 
+            <div class="full-separator" id="sep-pattern" hidden>Pattern</div>
             <ol id="pattern-clusters" class="cluster-bars">
                 <li class="cluster-item empty">No data</li>
             </ol>
 
+            <div class="full-separator" id="sep-etterna" hidden>Etterna | Overall: --</div>
             <ol id="ett-skill-bars" class="ett-skill-bars" hidden>
                 <li class="ett-skill-item empty">No data</li>
             </ol>
 
+            <div class="full-separator" id="sep-graph" hidden>Graph</div>
             <div class="body-graph-wrap" id="body-graph-wrap" hidden>
                 <svg id="body-graph" class="body-graph" viewBox="0 0 260 86" preserveAspectRatio="xMidYMid meet" aria-label="Body difficulty graph" role="img">
                     <path id="body-graph-fill" class="star-graph-fill" d=""></path>

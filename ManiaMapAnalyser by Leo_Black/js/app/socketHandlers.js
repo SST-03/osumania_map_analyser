@@ -1,5 +1,5 @@
 import {
-    getActiveContentBar,
+    hasAnyGraphModeEnabled,
     MOD_BIT_FLAG_ENTRIES,
     NOTE_END_MARGIN_MS,
     PAUSE_DETECT_EPSILON_MS,
@@ -28,6 +28,7 @@ import {
 import { updateCardPlayVisibility } from "./hud.js";
 import { scheduleRecompute } from "./scheduler.js";
 import { getCounterPathForCommand } from "./settings.js";
+import { applyCoverThemeForBeatmap } from "./coverTheme.js";
 
 
 function getModData(data) {
@@ -81,7 +82,7 @@ function updateSongTimeState(data) {
         state.songTimeReceiveTs = now;
         state.frozenInterpMs = scaledLiveTimeMs;
 
-        if (state.diffText === "Graph" || getActiveContentBar() === "Graph") {
+        if (hasAnyGraphModeEnabled()) {
             updateGraphCursor(state.songTimeMs);
         }
         return;
@@ -136,7 +137,7 @@ function updateSongTimeState(data) {
         state.prevSongTimeReceiveTs = state.songTimeReceiveTs;
     }
 
-    if (state.diffText === "Graph" || getActiveContentBar() === "Graph") {
+    if (hasAnyGraphModeEnabled()) {
         updateGraphCursor(state.pauseDetectionEnabled && state.isPaused ? state.frozenInterpMs : state.songTimeMs);
     }
 }
@@ -201,8 +202,36 @@ export function setupSocketListener() {
             normalizeText(beatmap?.mapper),
         ].join("::").toLowerCase();
 
+        // 曲（mapset）单位的标识：不含 version/难度名，也不含 md5/id/path，
+        // 这样同一 mapset 内切换难度时 songKey 保持不变，可据此区分
+        // "换歌" 与 "换难度"。
+        const beatmapSetId = normalizeNumberText(beatmap?.set || beatmap?.setId || beatmap?.beatmapSetId);
+        const beatmapFolderPath = (() => {
+            const folder = normalizePathText(data?.directPath?.beatmapBackground
+                || data?.directPath?.audioFile
+                || data?.folders?.beatmap);
+            if (folder) return folder;
+            if (!beatmapPath) return "";
+            // 退而求其次：取谱面文件所在目录作为 mapset 归属。
+            const lastSlash = beatmapPath.lastIndexOf("/");
+            return lastSlash > 0 ? beatmapPath.slice(0, lastSlash) : beatmapPath;
+        })();
+        const songMetaKey = [
+            normalizeText(beatmap?.artist),
+            normalizeText(beatmap?.title),
+            normalizeText(beatmap?.mapper),
+        ].join("::").toLowerCase();
+        const songKeyParts = [];
+        if (beatmapSetId) songKeyParts.push(`set:${beatmapSetId}`);
+        if (beatmapFolderPath) songKeyParts.push(`dir:${beatmapFolderPath}`);
+        if (songKeyParts.length === 0 && songMetaKey.replace(/[:]/g, "").length > 0) {
+            songKeyParts.push(`meta:${songMetaKey}`);
+        }
+        const nextSongKey = songKeyParts.join("|");
+
         const previousBeatmapIdentity = state.lastBeatmapIdentity || "";
         const previousModSignature = state.modSignature || "";
+        const previousSongKey = state.lastSongKey || "";
 
         const identityParts = [];
         if (beatmapId) {
@@ -242,10 +271,31 @@ export function setupSocketListener() {
             state.modSignature = nextModSignature;
         }
 
+        // 区分本次变化的类型，供渲染层选择对应的入场动画：
+        //   song       —— 换歌（mapset 变了，或首次加载）
+        //   difficulty —— 换难度（同一 mapset 内切换谱面）
+        //   mod        —— 仅 mod 改变，谱面与难度都没变
+        const identityChanged = nextBeatmapIdentity !== previousBeatmapIdentity;
+        let changeKind = "mod";
+        if (identityChanged) {
+            const songChanged = !previousSongKey
+                || !nextSongKey
+                || nextSongKey !== previousSongKey;
+            changeKind = songChanged ? "song" : "difficulty";
+        }
+        state.pendingChangeKind = changeKind;
+
         state.lastBeatmapIdentity = nextBeatmapIdentity;
+        state.lastSongKey = nextSongKey;
         state.lastBeatmapIdentitySource = identityParts.length > 1
             ? "composite"
             : (identityParts[0]?.split(":")[0] || "");
+
+        // 仅在谱面本身（非单纯改 mod）发生变化时，重新取封面主色刷新主题。
+        // 取色异步进行、失败自动退默认，绝不阻塞分析流程。
+        if (state.enableCoverArt && nextBeatmapIdentity !== previousBeatmapIdentity) {
+            applyCoverThemeForBeatmap(nextBeatmapIdentity).catch(() => {});
+        }
         const key = `${nextBeatmapIdentity}|${nextModSignature}`;
         resetPauseRuntime(true);
         state.lastBeatmapKey = key;

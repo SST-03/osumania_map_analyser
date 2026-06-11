@@ -3,15 +3,16 @@ import {
     ETT_SKILLSET_ORDER,
     ETT_SKILLSET_ORDER_NO_TECHNICAL,
     ettSkillBarsEl,
-    getActiveContentBar,
+    contentBarShows,
     mainCardEl,
-    PATTERN_BAR_GRADIENT,
     patternClustersEl,
+    reworkBlockEl,
     reworkDiffEl,
     reworkRightCapsuleEl,
     reworkStarEl,
     STAR_BG_STOPS,
     STAR_TEXT_STOPS,
+    starTipEl,
     state,
 } from "./appContext.js";
 
@@ -230,6 +231,52 @@ function restartAnimationClass(element, className) {
     element.classList.add(className);
 }
 
+const RC_SUFFIX_LEVELS = {
+    "low": 1,
+    "mid/low": 2,
+    "mid": 3,
+    "mid/high": 4,
+    "high": 5,
+};
+
+const RC_SUFFIX_ORDER = Object.keys(RC_SUFFIX_LEVELS).sort((a, b) => b.length - a.length);
+
+function parseRcDifficultyLevel(diffText) {
+    if (!diffText || diffText === "-") {
+        return 0;
+    }
+
+    // For combined "RC || LN", take only the RC part (first line after formatDiffForDisplay split)
+    const rcPart = diffText.split("\n")[0].trim();
+    if (!rcPart) {
+        return 0;
+    }
+
+    // Check longer (more specific) suffixes first: "mid/low" and "mid/high"
+    // before the shorter "low", "mid", "high"
+    for (const suffix of RC_SUFFIX_ORDER) {
+        if (rcPart.endsWith(suffix)) {
+            return RC_SUFFIX_LEVELS[suffix];
+        }
+    }
+
+    return 0;
+}
+
+export function updateStarTipDots(diffText) {
+    if (!starTipEl) {
+        return;
+    }
+
+    const level = parseRcDifficultyLevel(diffText);
+    const dots = starTipEl.querySelectorAll(".star-dot");
+
+    dots.forEach((dot) => {
+        const dotLevel = Number(dot.dataset.level);
+        dot.classList.toggle("lit", dotLevel >= 1 && dotLevel <= level);
+    });
+}
+
 function estimateBodySkeletonItemCount(mode) {
     const isEtterna = mode === "etterna";
     const minimum = isEtterna ? (state.etternaTechnicalHidden ? 6 : 7) : 5;
@@ -298,7 +345,7 @@ export function mergeDuplicateClusters(clusters) {
 }
 
 export function renderClusterSkeleton() {
-    if (getActiveContentBar() !== "Pattern") {
+    if (!contentBarShows("Pattern")) {
         patternClustersEl.innerHTML = "";
         return;
     }
@@ -315,7 +362,7 @@ export function renderClusterSkeleton() {
 }
 
 export function renderEtternaSkeleton() {
-    if (getActiveContentBar() !== "Etterna") {
+    if (!contentBarShows("Etterna")) {
         ettSkillBarsEl.innerHTML = "";
         return;
     }
@@ -347,7 +394,28 @@ export function setEstimateDifficultyText(value) {
     }
 
     reworkDiffEl.textContent = nextText;
-    restartAnimationClass(reworkDiffEl, "diff-swap");
+    // 换歌时难度名做横向滑入，换难度时维持原来的纵向轻弹，从动作方向上区分两种场景。
+    reworkDiffEl.classList.remove("diff-swap", "song-swap");
+    const swapClass = state.activeChangeKind === "song" ? "song-swap" : "diff-swap";
+    void reworkDiffEl.offsetWidth;
+    reworkDiffEl.classList.add(swapClass);
+
+    updateStarTipDots(nextText);
+}
+
+// 换歌时让整个 star 区块做一次明显的入场（淡入 + 上移 + 轻微放大），
+// 换难度 / 仅改 mod 时不触发，避免每次切难度都“整块重刷”显得吵闹。
+export function playStarBlockEntrance(changeKind) {
+    if (!reworkBlockEl) {
+        return;
+    }
+
+    reworkBlockEl.classList.remove("song-enter");
+    if (changeKind !== "song") {
+        return;
+    }
+    void reworkBlockEl.offsetWidth;
+    reworkBlockEl.classList.add("song-enter");
 }
 
 export function showNumericStarValue(starValue) {
@@ -528,7 +596,7 @@ export function renderRightCapsule(diffMode, reworkStarValue, patternCategoryTex
     reworkRightCapsuleEl.style.textShadow = "none";
 }
 
-export function renderPatternClusters(clusters) {
+function buildPatternItemData(clusters) {
     const topFive = [...(clusters || [])].slice(0, 5);
     const maxAmount = Math.max(...topFive.map((cluster) => Number(cluster?.Amount) || 0), 1);
 
@@ -536,37 +604,69 @@ export function renderPatternClusters(clusters) {
         topFive.push(null);
     }
 
-    patternClustersEl.innerHTML = topFive
-        .map((cluster, index) => {
-            if (!cluster) {
-                return `
-                    <li class="cluster-item empty" style="--item-delay:${index * ITEM_STAGGER_DELAY_MS}ms">
-                        <div class="cluster-label">-</div>
-                        <div class="cluster-track">
-                            <div class="cluster-fill" style="--bar-width:0%"></div>
-                        </div>
-                        <div class="cluster-subtype">-</div>
-                    </li>
-                `;
-            }
+    return topFive.map((cluster) => {
+        if (!cluster) {
+            return { empty: true, label: "-", subtype: "-", width: "0" };
+        }
+        const ratio = Math.max(0, Math.min((cluster.Amount / maxAmount) * 100, 100));
+        return {
+            empty: false,
+            label: cluster.Pattern,
+            subtype: formatClusterSpecificTypes(cluster.SpecificTypes),
+            width: ratio.toFixed(2),
+        };
+    });
+}
 
-            const ratio = Math.max(0, Math.min((cluster.Amount / maxAmount) * 100, 100));
-            const subtype = formatClusterSpecificTypes(cluster.SpecificTypes);
-            return `
-                <li class="cluster-item" style="--item-delay:${index * ITEM_STAGGER_DELAY_MS}ms">
-                    <div class="cluster-label">${cluster.Pattern}</div>
+// 换难度 / 改设置时复用现有的条目结构，只更新文字和填充宽度，让进度条横向
+// 平滑过渡（progress-bar 风格），而不是整组重建后再逐条弹入。只有换歌时才整组
+// 重建走入场动画。
+function canUpdateBarsInPlace(listEl, expectedCount, fillSelector) {
+    if (state.activeChangeKind === "song") {
+        return false;
+    }
+    const items = listEl.querySelectorAll(":scope > li");
+    if (items.length !== expectedCount) {
+        return false;
+    }
+    return [...items].every((el) => el.querySelector(fillSelector));
+}
+
+export function renderPatternClusters(clusters) {
+    const items = buildPatternItemData(clusters);
+
+    if (canUpdateBarsInPlace(patternClustersEl, items.length, ".cluster-fill")) {
+        patternClustersEl.classList.add("bars-live");
+        const rows = patternClustersEl.querySelectorAll(":scope > li");
+        items.forEach((item, index) => {
+            const row = rows[index];
+            row.classList.toggle("empty", item.empty);
+            const labelEl = row.querySelector(".cluster-label");
+            const subtypeEl = row.querySelector(".cluster-subtype");
+            const fillEl = row.querySelector(".cluster-fill");
+            if (labelEl) labelEl.textContent = item.label;
+            if (subtypeEl) subtypeEl.textContent = item.subtype;
+            if (fillEl) fillEl.style.setProperty("--bar-width", `${item.width}%`);
+        });
+        return;
+    }
+
+    patternClustersEl.classList.remove("bars-live");
+    patternClustersEl.innerHTML = items
+        .map((item, index) => `
+                <li class="cluster-item${item.empty ? " empty" : ""}" style="--item-delay:${index * ITEM_STAGGER_DELAY_MS}ms">
+                    <div class="cluster-label">${item.label}</div>
                     <div class="cluster-track">
-                        <div class="cluster-fill" style="--bar-width:${ratio.toFixed(2)}%"></div>
+                        <div class="cluster-fill" style="--bar-width:${item.width}%"></div>
                     </div>
-                    <div class="cluster-subtype">${subtype}</div>
+                    <div class="cluster-subtype">${item.subtype}</div>
                 </li>
-            `;
-        })
+            `)
         .join("");
 }
 
 export function renderEtternaSkillBars(values, columnCount) {
-    if (getActiveContentBar() !== "Etterna") {
+    if (!contentBarShows("Etterna")) {
         state.etternaTechnicalHidden = false;
         mainCardEl.classList.remove("bars-etterna-compact");
         ettSkillBarsEl.innerHTML = "";
@@ -580,32 +680,63 @@ export function renderEtternaSkillBars(values, columnCount) {
 
     const skillOrder = hideTechnical ? ETT_SKILLSET_ORDER_NO_TECHNICAL : ETT_SKILLSET_ORDER;
 
-    ettSkillBarsEl.innerHTML = skillOrder
-        .map((skillName, index) => {
-            const rawValue = Number(safeValues[skillName]) || 0;
-            const clampedValue = Math.max(0, Math.min(rawValue, ETT_MAX_SKILL_VALUE));
-            const ratio = clampedValue / ETT_MAX_SKILL_VALUE;
-            const width = ratio * 100;
-            const labelPos = Math.max(8.0, Math.min(width, 97.0));
-            const fillBackground = state.enableEtternaRainbowBars
-                ? ETT_FULL_TRACK_RAINBOW_GRADIENT
-                : PATTERN_BAR_GRADIENT;
-            const fillBackgroundSize = state.enableEtternaRainbowBars
-                ? `${(100 / Math.max(ratio, 0.001)).toFixed(3)}% 100%`
-                : "100% 100%";
+    const rowData = skillOrder.map((skillName) => {
+        const rawValue = Number(safeValues[skillName]) || 0;
+        const clampedValue = Math.max(0, Math.min(rawValue, ETT_MAX_SKILL_VALUE));
+        const ratio = clampedValue / ETT_MAX_SKILL_VALUE;
+        const width = ratio * 100;
+        const labelPos = Math.max(8.0, Math.min(width, 97.0));
+        // Rainbow on: inline the rainbow gradient + stretched size for the
+        // sweep effect. Rainbow off: leave --ett-fill-bg unset so the
+        // theme.css accent rule (html.ma-theme-osu .ett-skill-fill) takes
+        // over, making the bar follow the cover-art color like pattern's
+        // cluster-fill does. Without the osu theme it falls back to the
+        // bars.css default gradient.
+        const fillStyle = state.enableEtternaRainbowBars
+            ? `--bar-width:${width.toFixed(2)}%;--ett-fill-bg:${ETT_FULL_TRACK_RAINBOW_GRADIENT};--ett-fill-bg-size:${(100 / Math.max(ratio, 0.001)).toFixed(3)}% 100%`
+            : `--bar-width:${width.toFixed(2)}%`;
+        return {
+            skillName,
+            value: rawValue.toFixed(2),
+            width: width.toFixed(2),
+            labelPos: labelPos.toFixed(2),
+            fillStyle,
+        };
+    });
 
-            return `
+    // 换难度 / 改设置且条目数量不变时，原地更新数值与填充宽度，让进度条平滑横向
+    // 过渡，不重建整组、不重放逐条弹入动画。换歌或列数变化时回到整组重建。
+    if (canUpdateBarsInPlace(ettSkillBarsEl, rowData.length, ".ett-skill-fill")) {
+        ettSkillBarsEl.classList.add("bars-live");
+        const rows = ettSkillBarsEl.querySelectorAll(":scope > li");
+        rowData.forEach((item, index) => {
+            const row = rows[index];
+            const labelEl = row.querySelector(".ett-skill-label");
+            const fillEl = row.querySelector(".ett-skill-fill");
+            const headEl = row.querySelector(".ett-skill-head");
+            if (labelEl) labelEl.textContent = item.skillName;
+            if (fillEl) fillEl.setAttribute("style", item.fillStyle);
+            if (headEl) {
+                headEl.textContent = item.value;
+                headEl.style.setProperty("--label-pos", `${item.labelPos}%`);
+            }
+        });
+        return;
+    }
+
+    ettSkillBarsEl.classList.remove("bars-live");
+    ettSkillBarsEl.innerHTML = rowData
+        .map((item, index) => `
                 <li class="ett-skill-item" style="--item-delay:${index * 60}ms">
-                    <div class="ett-skill-label">${skillName}</div>
+                    <div class="ett-skill-label">${item.skillName}</div>
                     <div class="ett-skill-track">
                         <div class="ett-skill-track-inner">
-                            <div class="ett-skill-fill" style="--bar-width:${width.toFixed(2)}%;--ett-fill-bg:${fillBackground};--ett-fill-bg-size:${fillBackgroundSize}"></div>
+                            <div class="ett-skill-fill" style="${item.fillStyle}"></div>
                         </div>
-                        <div class="ett-skill-head" style="--label-pos:${labelPos.toFixed(2)}%">${rawValue.toFixed(2)}</div>
+                        <div class="ett-skill-head" style="--label-pos:${item.labelPos}%">${item.value}</div>
                     </div>
                 </li>
-            `;
-        })
+            `)
         .join("");
 }
 
@@ -614,6 +745,17 @@ export function formatDiffForDisplay(diffText) {
         return "-";
     }
     return String(diffText).split("||").map((part) => part.trim()).join("\n");
+}
+
+export function renderFullModeSeparators(ettOverallValue) {
+    const sepEtterna = document.getElementById("sep-etterna");
+    if (!sepEtterna) return;
+
+    if (Number.isFinite(ettOverallValue)) {
+        sepEtterna.textContent = `Etterna | Overall: ${ettOverallValue.toFixed(2)}`;
+    } else {
+        sepEtterna.textContent = "Etterna | Overall: --";
+    }
 }
 
 export function formatMetadataStatus(metadata) {

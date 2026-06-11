@@ -8,12 +8,20 @@
 		"value": ""
 	},
 	{
-		"uniqueID": "GuideButton",
+		"uniqueID": "GuideButtonEN",
 		"type": "button",
-		"title": "Settings Guide",
-		"description": "Go to the repo's readme.md file for settings usage instructions and more information.",
+		"title": "Settings Guide(English)",
+		"description": "Go to the repo's README_EN.md file for settings usage instructions and more information.",
 		"options": [],
 		"value": "https://github.com/LeoBlackMT/osumania_map_analyser/blob/main/README_EN.md#settings"
+	},
+	{
+		"uniqueID": "GuideButtonCN",
+		"type": "button",
+		"title": "设置说明(中文)",
+		"description": "前往 GitHub 页面查看下方所有设置的说明。",
+		"options": [],
+		"value": "https://github.com/LeoBlackMT/osumania_map_analyser/blob/main/README.md#%E8%AE%BE%E7%BD%AE%E8%AF%B4%E6%98%8E"
 	},
 	{
 		"uniqueID": "IssueButton",
@@ -32,9 +40,9 @@
 		"value": "https://leoblackmt.github.io/osumania_map_analyser"
 	},
 	{
-		"uniqueID": "hVisual",
+		"uniqueID": "hModules",
 		"type": "header",
-		"title": "Visual Customization",
+		"title": "Modules Customization",
 		"description": "",
 		"options": [],
 		"value": ""
@@ -43,13 +51,14 @@
 		"uniqueID": "contentBar",
 		"type": "options",
 		"title": "Card Body Content",
-		"description": "Select what to show in the card body.",
+		"description": "Select what to show in the card body. Full shows Pattern, Etterna and Graph together.",
 		"options": [
 			"None",
 			"Auto",
 			"Pattern",
 			"Etterna",
-			"Graph"
+			"Graph",
+			"Full"
 		],
 		"value": "Auto"
 	},
@@ -84,64 +93,66 @@
 		"value": "Difficulty"
 	},
 	{
-		"uniqueID": "cardOpacity",
-		"type": "options",
-		"title": "Card Opacity",
-		"description": "Set overall card opacity.",
-		"options": [
-			"100%",
-			"95%",
-			"90%",
-			"80%",
-			"70%"
-		],
-		"value": "95%"
-	},
-	{
-		"uniqueID": "cardBlur",
-		"type": "options",
-		"title": "Card Blur",
-		"description": "Set card background blur strength.",
-		"options": [
-			"Off",
-			"Soft",
-			"Strong"
-		],
-		"value": "Soft"
-	},
-	{
-		"uniqueID": "cardRadius",
-		"type": "options",
-		"title": "Card Radius",
-		"description": "Set card corner roundness.",
-		"options": [
-			"Small",
-			"Medium",
-			"Large"
-		],
-		"value": "Medium"
-	},
-	{
 		"uniqueID": "showModeTagCapsule",
 		"type": "checkbox",
 		"title": "Map Tag Capsule",
-		"description": "Show the Map tag capsule (HB/RC/LN/Mix) at bottom-left.",
+		"description": "Show the Map tag capsule (HB/RC/LN/Mix/SV) at bottom-left.",
 		"options": [],
 		"value": true
+	},
+	{
+		"uniqueID": "hTheme",
+		"type": "header",
+		"title": "Theme & Effects",
+		"description": "",
+		"options": [],
+		"value": ""
+	},
+	{
+		"uniqueID": "enableOsuTheme",
+		"type": "checkbox",
+		"title": "osu!Lazer Card Theme",
+		"description": "Use the osu!Lazer-style themed card.",
+		"options": [],
+		"value": true
+	},
+	{
+		"uniqueID": "enableFloatingTriangles",
+		"type": "checkbox",
+		"title": "Floating Triangles Animation",
+		"description": "[Requires Lazer Card Theme] Show the animated triangles drifting up behind the card.",
+		"options": [],
+		"value": true
+	},
+	{
+		"uniqueID": "enableCoverArt",
+		"type": "checkbox",
+		"title": "Cover Art Background",
+		"description": "[Requires Lazer Card Theme] Lay the beatmap's background behind the content blocks. Suggested to set a custom background color if disabled.",
+		"options": [],
+		"value": true
+	},
+	{
+		"uniqueID": "customBackgroundColor",
+		"type": "color",
+		"title": "Custom Background Color",
+		"description": "[Requires Lazer Card Theme] Use a custom color instead of sampling the beatmap's background. Set to pure black (#000000) to disable.",
+		"options": [],
+		"value": "#000000"
+	},
+	{
+		"uniqueID": "enableEtternaRainbowBars",
+		"type": "checkbox",
+		"title": "Rainbow Bars",
+		"description": "Enable multi-color bars in Etterna mode. Suggested to disable if Lazer theme is enabled.",
+		"options": [],
+		"value": false
 	},
 	{
 		"uniqueID": "enableStatusMarquee",
 		"type": "checkbox",
 		"title": "Metadata Marquee",
 		"description": "Enable horizontal marquee scrolling for long metadata text.",
-		"options": [],
-		"value": true
-	},
-	{
-		"uniqueID": "enableEtternaRainbowBars",
-		"type": "checkbox",
-		"title": "Rainbow Bars",
-		"description": "Enable multi-color bars in Etterna mode.",
 		"options": [],
 		"value": true
 	},
@@ -168,6 +179,47 @@
 		"description": "Anchor card bottom and extend upwards when card needs to extend.",
 		"options": [],
 		"value": false
+	},
+	{
+		"uniqueID": "cardOpacity",
+		"type": "options",
+		"title": "Card Opacity",
+		"description": "Set overall card opacity.",
+		"options": [
+			"100%",
+			"95%",
+			"90%",
+			"80%",
+			"70%"
+		],
+		"value": "95%"
+	},
+	{
+		"uniqueID": "cardBgBlur",
+		"type": "options",
+		"title": "Content Background Blur",
+		"description": "Gaussian blur strength for the cover art behind the Pattern, Etterna and Graph blocks. Requires Cover Art Theme.",
+		"options": [
+			"Off",
+			"4px",
+			"8px",
+			"12px",
+			"16px",
+			"20px"
+		],
+		"value": "4px"
+	},
+	{
+		"uniqueID": "cardRadius",
+		"type": "options",
+		"title": "Card Radius",
+		"description": "Set card corner roundness.",
+		"options": [
+			"Small",
+			"Medium",
+			"Large"
+		],
+		"value": "Medium"
 	},
 	{
 		"uniqueID": "hFunctions",
