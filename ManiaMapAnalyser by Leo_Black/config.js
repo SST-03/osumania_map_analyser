@@ -101,7 +101,7 @@ export const APP_CONFIG = {
         enableCoverArt: true,
         customBackgroundColor: "#000000",
         contentBar: "Auto",
-        srText: "Auto",
+        srText: "ReworkSR",
         diffText: "Difficulty",
         debugUseAmount: false,
     },
