@@ -117,6 +117,14 @@
 		"value": true
 	},
 	{
+		"uniqueID": "useOsuFont",
+		"type": "checkbox",
+		"title": "osu! Font",
+		"description": "Use the Osu Torus font on the analysis card only.",
+		"options": [],
+		"value": true
+	},
+	{
 		"uniqueID": "enableFloatingTriangles",
 		"type": "checkbox",
 		"title": "Floating Triangles Animation",

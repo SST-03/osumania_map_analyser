@@ -1,6 +1,6 @@
 ﻿import { initialize } from "./js/app/main.js";
 
-const _VERSION = "1.6.0";
+const _VERSION = "1.6.1";
 
 if (typeof window !== "undefined") {
 	window.__MMA_VERSION = _VERSION;

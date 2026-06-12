@@ -31,6 +31,7 @@ import {
     parseShowModeTagCapsuleValue,
     parseEnableUpdateCheckValue,
     parseReverseCardExtendDirectionValue,
+    parseUseOsuFontValue,
     parseSrTextValue,
     parseSvDetectionValue,
     parseVibroDetectionValue,
@@ -203,6 +204,7 @@ function applyVisualStyleSettings() {
         mainCardEl.style.setProperty("--ma-cover-blur", bgBlur);
         mainCardEl.style.setProperty("--card-extend-origin", state.reverseCardExtendDirection ? "bottom" : "top");
         mainCardEl.classList.toggle("hide-title-icon", !shouldShowUpdateIcon);
+        mainCardEl.classList.toggle("use-osu-font", state.useOsuFont);
     }
 
     if (dashboardEl) {
@@ -619,6 +621,14 @@ export function applyReverseCardExtendDirectionSetting(value) {
     return changed;
 }
 
+export function applyUseOsuFontSetting(value) {
+    const next = normalizeBooleanSetting(value, APP_CONFIG.defaults.useOsuFont);
+    const changed = state.useOsuFont !== next;
+    state.useOsuFont = next;
+    applyVisualStyleSettings();
+    return changed;
+}
+
 function extractSettingsPayloadFromCommandPacket(packet) {
     if (Array.isArray(packet)) {
         return packet;
@@ -679,6 +689,7 @@ export function setupSettingsCommandListener() {
         const cardBgBlurChanged = applyIf("cardBgBlur", applyCardBgBlurSetting, parseCardBgBlurValue(payload));
         const enableUpdateCheckChanged = applyIf("enableUpdateCheck", applyEnableUpdateCheckSetting, parseEnableUpdateCheckValue(payload));
         const reverseCardDirectionChanged = applyIf("reverseCardExtendDirection", applyReverseCardExtendDirectionSetting, parseReverseCardExtendDirectionValue(payload));
+        const osuFontChanged = applyIf("useOsuFont", applyUseOsuFontSetting, parseUseOsuFontValue(payload));
         const svChanged = applyIf("useSvDetection", applyUseSvDetectionSetting, parseSvDetectionValue(payload));
         const osuThemeChanged = applyIf("enableOsuTheme", applyEnableOsuThemeSetting, parseEnableOsuThemeValue(payload));
         const floatingTrianglesChanged = applyIf("enableFloatingTriangles", applyEnableFloatingTrianglesSetting, parseEnableFloatingTrianglesValue(payload));
@@ -714,6 +725,7 @@ export function setupSettingsCommandListener() {
             || cardBgBlurChanged
             || enableUpdateCheckChanged
             || reverseCardDirectionChanged
+            || osuFontChanged
             || osuThemeChanged
             || floatingTrianglesChanged
             || coverArtChanged
@@ -813,6 +825,7 @@ export async function loadSettings() {
         applyCardBgBlurSetting(parseCardBgBlurValue(source));
         applyEnableUpdateCheckSetting(parseEnableUpdateCheckValue(source));
         applyReverseCardExtendDirectionSetting(parseReverseCardExtendDirectionValue(source));
+        applyUseOsuFontSetting(parseUseOsuFontValue(source));
         applyEnableOsuThemeSetting(parseEnableOsuThemeValue(source));
         applyEnableFloatingTrianglesSetting(parseEnableFloatingTrianglesValue(source));
         applyEnableCoverArtSetting(parseEnableCoverArtValue(source));
@@ -848,6 +861,7 @@ export async function loadSettings() {
             cardBgBlur: APP_CONFIG.defaults.cardBgBlur,
             enableUpdateCheck: APP_CONFIG.defaults.enableUpdateCheck,
             reverseCardExtendDirection: APP_CONFIG.defaults.reverseCardExtendDirection,
+            useOsuFont: APP_CONFIG.defaults.useOsuFont,
             enableOsuTheme: APP_CONFIG.defaults.enableOsuTheme,
             enableFloatingTriangles: APP_CONFIG.defaults.enableFloatingTriangles,
             enableCoverArt: APP_CONFIG.defaults.enableCoverArt,

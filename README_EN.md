@@ -76,6 +76,7 @@ Note: It is recommended to start with the default settings and then adjust accor
 - **Theme & Effects**:
     - **osu!Lazer Card Theme**: Whether to enable the Lazer-style card theme.
         - When enabled, the card adopts a design style similar to osu!lazer, and enables certain settings only available under the Lazer theme.
+    - **osu! Font**: Whether to use the bundled Torus font inside the card only.
     - **Floating Triangles Animation**: Whether to enable the floating triangle animation effect on the card background.
         - This option only takes effect when the Lazer Card Theme is enabled.
     - **Cover Art Background**: Whether to use the beatmap's background image as the card background.

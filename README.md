@@ -75,6 +75,7 @@
 - **主题与效果**：
     - **osu!Lazer Card Theme**: 是否启用Lazer风格的卡片主题。
         - 启用后将使用类似于osu!lazer的卡片设计风格，并启用部分仅在Lazer主题下可用的设置项。
+    - **osu! Font**: 是否仅在卡片内使用内置 Torus 字体。
     - **Floating Triangles Animation**: 是否启用卡片背景的浮动三角形动画效果。
         - 该选项仅在启用Lazer Card Theme时生效。
     - **Cover Art Background**: 是否将谱面背景图作为卡片背景。

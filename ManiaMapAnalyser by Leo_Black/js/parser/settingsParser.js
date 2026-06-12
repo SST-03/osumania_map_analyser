@@ -497,6 +497,11 @@ export function createSettingsParsers(appConfig) {
         return normalizeBooleanSetting(value, appConfig.defaults.reverseCardExtendDirection);
     }
 
+    function parseUseOsuFontValue(settingsPayload) {
+        const value = extractSettingValue(settingsPayload, "useOsuFont");
+        return normalizeBooleanSetting(value, appConfig.defaults.useOsuFont);
+    }
+
     function parsePauseDetectionThresholdValue(settingsPayload) {
         const value = extractSettingValue(settingsPayload, "pauseDetectionThreshold");
         if (value !== undefined && value !== null) {
@@ -559,6 +564,7 @@ export function createSettingsParsers(appConfig) {
         parseCardBgBlurValue,
         parseEnableUpdateCheckValue,
         parseReverseCardExtendDirectionValue,
+        parseUseOsuFontValue,
         parseSvDetectionValue,
         parseWsEndpointValue,
     };
