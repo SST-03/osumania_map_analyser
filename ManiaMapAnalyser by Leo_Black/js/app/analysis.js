@@ -1,6 +1,7 @@
 import { runSunnyEstimatorFromText } from "../estimator/sunnyEstimator.js";
 import { runDanielEstimatorFromText } from "../estimator/danielEstimator.js";
 import { runAzusaEstimatorFromText } from "../estimator/azusaEstimator.js";
+import { runRoxyEstimatorFromText } from "../estimator/roxyEstimator.js";
 import {
     applyCompanellaToMixedResult,
     runMixedEstimatorFromText,
@@ -395,6 +396,18 @@ export async function fetchBeatmapFile(reason) {
             } else if (estimatorAlgorithm === "Azusa") {
                 const wp = runInWorker(rawText, { ...estimatorOptions, estimatorAlgorithm, forceSunnyReferenceHo: state.azusaSunnyReferenceHo });
                 selectedRework = wp ? await wp : runAzusaEstimatorFromText(rawText, azusaOptions);
+                actualEstimatorAlgorithm = selectedRework?.actualEstimatorAlgorithm || actualEstimatorAlgorithm;
+                if (!isValidEstimatorResult(selectedRework)) {
+                    selectedRework = runSunnyEstimatorFromText(rawText, estimatorOptions);
+                    actualEstimatorAlgorithm = "Sunny";
+                }
+                nextEstDiff = selectedRework.estDiff;
+                nextNumericDifficulty = selectedRework.numericDifficulty;
+                nextNumericDifficultyHint = selectedRework.numericDifficultyHint;
+            } else if (estimatorAlgorithm === "Roxy") {
+                const wp = runInWorker(rawText, { ...estimatorOptions, estimatorAlgorithm });
+                selectedRework = wp ? await wp : runRoxyEstimatorFromText(rawText, estimatorOptions);
+                actualEstimatorAlgorithm = selectedRework?.actualEstimatorAlgorithm || actualEstimatorAlgorithm;
                 if (!isValidEstimatorResult(selectedRework)) {
                     selectedRework = runSunnyEstimatorFromText(rawText, estimatorOptions);
                     actualEstimatorAlgorithm = "Sunny";

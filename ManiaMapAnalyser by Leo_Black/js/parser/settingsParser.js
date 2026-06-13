@@ -38,6 +38,7 @@ export function normalizeEstimatorAlgorithmValue(value) {
 
     const lowered = value.trim().toLowerCase();
     if (lowered === "azusa") return "Azusa";
+    if (lowered === "roxy") return "Roxy";
     if (lowered === "mixed") return "Mixed";
     if (lowered === "mix") return "Mixed";
     if (lowered === "sunny") return "Sunny";

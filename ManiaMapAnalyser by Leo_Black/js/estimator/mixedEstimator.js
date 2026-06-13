@@ -102,7 +102,7 @@ function canUseAzusaResult(result) {
 }
 
 export function runMixedEstimatorFromText(osuText, options = {}) {
-    const sunnyBaseline = runSunnyEstimatorFromText(osuText, options);
+    const sunnyBaseline = options.precomputedSunnyResult || runSunnyEstimatorFromText(osuText, options);
     const columnCount = Number(sunnyBaseline.columnCount);
     if (!Number.isFinite(columnCount) || !MIXED_SUPPORTED_KEYS.has(columnCount)) {
         return {

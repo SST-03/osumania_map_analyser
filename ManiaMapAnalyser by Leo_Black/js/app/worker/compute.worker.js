@@ -10,8 +10,9 @@
 import { runSunnyEstimatorFromText } from "../../estimator/sunnyEstimator.js";
 import { runDanielEstimatorFromText } from "../../estimator/danielEstimator.js";
 import { runAzusaEstimatorFromText } from "../../estimator/azusaEstimator.js";
+import { runRoxyEstimatorFromText } from "../../estimator/roxyEstimator.js";
 
-const ESTIMATORS = { Sunny: "Sunny", Daniel: "Daniel", Azusa: "Azusa" };
+const ESTIMATORS = { Sunny: "Sunny", Daniel: "Daniel", Azusa: "Azusa", Roxy: "Roxy" };
 
 self.onmessage = (event) => {
     const { id, osuText, options } = event.data || {};
@@ -24,6 +25,7 @@ self.onmessage = (event) => {
 
     try {
         let result = null;
+        let actualEstimatorAlgorithm = estimator;
 
         if (estimator === "Daniel") {
             result = runDanielEstimatorFromText(osuText, options);
@@ -35,11 +37,22 @@ self.onmessage = (event) => {
             result = runAzusaEstimatorFromText(osuText, azusaOpts);
             if (!isValidResult(result)) {
                 result = runSunnyEstimatorFromText(osuText, options);
+                actualEstimatorAlgorithm = "Sunny";
+            }
+        } else if (estimator === ESTIMATORS.Roxy) {
+            result = runRoxyEstimatorFromText(osuText, options);
+            if (!isValidResult(result)) {
+                result = runSunnyEstimatorFromText(osuText, options);
+                actualEstimatorAlgorithm = "Sunny";
             }
         } else {
             result = runSunnyEstimatorFromText(osuText, options);
+            actualEstimatorAlgorithm = "Sunny";
         }
 
+        if (result && typeof result === "object") {
+            result = { ...result, actualEstimatorAlgorithm };
+        }
         self.postMessage({ id, result }, []);
     } catch (err) {
         self.postMessage({ id, error: err?.message || String(err) });
