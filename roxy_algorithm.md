@@ -53,7 +53,14 @@ All structural parameters are centralized in `ROXY_CONFIG`.
 | `sectionMs` | `400` | Section width for section peak aggregation |
 | `sectionDecay` | `0.9` | Descending-section weight decay |
 
-### 2.3 Structural Raw Mapping
+### 2.3 Graph Smoothing
+
+| Constant | Value | Description |
+|----------|------:|-------------|
+| `graphSmoothingTauMs` | `650` | Time constant for graph-only bidirectional exponential smoothing |
+| `graphRawBlend` | `0.12` | Fraction of original graph signal mixed back after smoothing |
+
+### 2.4 Structural Raw Mapping
 
 | Constant | Value | Description |
 |----------|------:|-------------|
@@ -69,7 +76,7 @@ logRaw     = ln(1 + max(0, rawAgg))
 preNumeric = clamp(linearMap(logRaw, p02, p98, -2, 20), -2.5, 21)
 ```
 
-### 2.4 Stream Weights
+### 2.5 Stream Weights
 
 | Stream | Weight | Purpose |
 |--------|-------:|---------|
@@ -81,7 +88,7 @@ preNumeric = clamp(linearMap(logRaw, p02, p98, -2, 20), -2.5, 21)
 | `stamina` | `0.11` | Sustained NPS and hand stamina |
 | `course` | `0.05` | Long-duration course-like stamina |
 
-### 2.5 Stream Decay Model
+### 2.6 Stream Decay Model
 
 Each stream has a burst state and a stamina state:
 
@@ -786,6 +793,23 @@ finalNumeric = clamp(max(baselineFloor, extremeStructuralFloor), -2, 20)
 ```
 
 The unguarded meta value is still exposed in debug as `unguardedNumeric` / `metaNumeric`. The final clamp remains `20` because the current RC label system only defines labels through `Kappa high`.
+
+### 12.5 Graph Smoothing
+
+Roxy's numeric calculation uses the raw `localRaw` row strain. Only the returned `graph` field is smoothed when `withGraph === true`.
+
+The graph pipeline is:
+
+```text
+localRaw row values
+-> 3-point median filter
+-> forward exponential smoothing, tau = 650ms
+-> backward exponential smoothing, tau = 650ms
+-> 0.12 raw + 0.88 smoothed blend
+-> graph.values
+```
+
+This removes row-level visual spikes without changing `numericDifficulty`, `rawNumericDifficulty`, stream summaries, or meta features.
 
 ---
 

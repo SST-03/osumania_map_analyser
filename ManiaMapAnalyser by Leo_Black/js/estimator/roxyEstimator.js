@@ -15,6 +15,8 @@ const ROXY_CONFIG = Object.freeze({
     sectionMs: 400,
     sectionDecay: 0.9,
     correctionClamp: 1.25,
+    graphSmoothingTauMs: 650,
+    graphRawBlend: 0.12,
     rawMap: Object.freeze({
         p02: 3.9947,
         p98: 7.5454,
@@ -403,6 +405,72 @@ function computeSectionAggregate(rows, localRaw) {
     }
 
     return safeDiv(total, weightTotal, 0);
+}
+
+function median3(a, b, c) {
+    return Math.max(Math.min(a, b), Math.min(Math.max(a, b), c));
+}
+
+function smoothGraphSeries(graph) {
+    const times = Array.isArray(graph?.times) ? graph.times : [];
+    const values = Array.isArray(graph?.values) ? graph.values : [];
+    const length = Math.min(times.length, values.length);
+    if (length < 3) {
+        return {
+            times: times.slice(0, length),
+            values: values.slice(0, length),
+        };
+    }
+
+    const cleanedTimes = new Array(length);
+    const cleanedValues = new Array(length);
+    for (let i = 0; i < length; i += 1) {
+        const previousTime = i > 0 ? cleanedTimes[i - 1] : 0;
+        const rawTime = Number(times[i]);
+        cleanedTimes[i] = Number.isFinite(rawTime) && (i === 0 || rawTime >= previousTime)
+            ? rawTime
+            : previousTime;
+
+        const rawValue = Number(values[i]);
+        cleanedValues[i] = Number.isFinite(rawValue) ? Math.max(0, rawValue) : 0;
+    }
+
+    const robustValues = new Array(length);
+    robustValues[0] = cleanedValues[0];
+    robustValues[length - 1] = cleanedValues[length - 1];
+    for (let i = 1; i < length - 1; i += 1) {
+        robustValues[i] = median3(cleanedValues[i - 1], cleanedValues[i], cleanedValues[i + 1]);
+    }
+
+    const tau = ROXY_CONFIG.graphSmoothingTauMs;
+    const forward = new Array(length);
+    forward[0] = robustValues[0];
+    for (let i = 1; i < length; i += 1) {
+        const dt = Math.max(1, cleanedTimes[i] - cleanedTimes[i - 1]);
+        const alpha = 1 - Math.exp(-dt / tau);
+        forward[i] = forward[i - 1] + alpha * (robustValues[i] - forward[i - 1]);
+    }
+
+    const backward = new Array(length);
+    backward[length - 1] = robustValues[length - 1];
+    for (let i = length - 2; i >= 0; i -= 1) {
+        const dt = Math.max(1, cleanedTimes[i + 1] - cleanedTimes[i]);
+        const alpha = 1 - Math.exp(-dt / tau);
+        backward[i] = backward[i + 1] + alpha * (robustValues[i] - backward[i + 1]);
+    }
+
+    const rawBlend = ROXY_CONFIG.graphRawBlend;
+    const smoothBlend = 1 - rawBlend;
+    const smoothedValues = new Array(length);
+    for (let i = 0; i < length; i += 1) {
+        const smoothed = (forward[i] + backward[i]) / 2;
+        smoothedValues[i] = (rawBlend * cleanedValues[i]) + (smoothBlend * smoothed);
+    }
+
+    return {
+        times: cleanedTimes,
+        values: smoothedValues,
+    };
 }
 
 function computeRoxyCurve(rows, taps, activity) {
@@ -1112,7 +1180,7 @@ export function runRoxyEstimatorFromText(osuText, options = {}) {
             estDiff,
             numericDifficulty: finalNumeric,
             numericDifficultyHint: "roxy-meta-gbdt-v2",
-            graph: options.withGraph === true ? curve.graph : null,
+            graph: options.withGraph === true ? smoothGraphSeries(curve.graph) : null,
             rawNumericDifficulty: Number(numericDetails.rawNumeric.toFixed(4)),
             debug: {
                 notes: taps.length,
