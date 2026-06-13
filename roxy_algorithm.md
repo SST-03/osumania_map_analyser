@@ -29,7 +29,7 @@ Parse .osu text
   -> build meta features from Azusa/Sunny/Daniel/Roxy
   -> evaluate GBDT calibration head
   -> apply high-speed monotonic guard
-  -> format RC label and optional smoothed graph
+  -> format RC label and optional Azusa graph
 ```
 
 The reference order is deliberately fixed:
@@ -288,22 +288,102 @@ Feature groups:
 
 Unavailable references are encoded as `has = 0` and `pred = 0`. The GBDT head returns the final calibrated numeric value.
 
-## 11. High-Speed Guard
+## 11. OD Override
 
-For `speedRate > 1`, Roxy applies an additional monotonic guard. The guard compares the meta value against:
+Roxy accepts `odFlag`, `OD`, `od`, or `overallDifficulty` in the options object. Supported values are:
+
+- `HR`
+- `EZ`
+- a numeric OD value, used for DA-style OD override
+
+The OD transform follows Sunny's judgement-window logic:
+
+```text
+effectiveOD = baseOD                         if no override
+effectiveOD = 6.462 + 0.715 * baseOD         if HR
+effectiveOD = -20.761 + 2.566 * baseOD       if EZ
+effectiveOD = numeric override               otherwise
+
+rawWindow = 0.3 * sqrt((64.5 - ceil(od * 3)) / 500)
+judgeWindow(od) = min(rawWindow, 0.6 * (rawWindow - 0.09) + 0.09)
+
+pressureRatio = clamp(baseWindow / effectiveWindow, 0.55, 1.85)
+odCorrection = clamp(log(pressureRatio) * (1.15 + 0.70 * gate(numeric, 6, 18)), -0.75, 0.75)
+```
+
+OD is applied after the meta model and before the high-speed guard. The meta reference layer is kept OD-neutral because the GBDT was trained without OD-varied samples; feeding OD-shifted Sunny/Azusa predictions into that model can create unstable reversals.
+
+## 12. High-Speed Guard
+
+For `speedRate > 1`, Roxy applies an additional lower-bound guard. The guard compares the meta value against:
 
 - the unsped baseline estimate
-- available reference predictions
-- an extreme structural floor derived from `logRaw`
-- a speed-rate lift derived from `log2(speedRate)`
+- a baseline-relative speed-rate lift
+- a recursive lower-rate anchor floor
+- a current-rate reference floor
+- an extreme structural floor derived from `logRaw` only when the current structure exceeds the calibrated raw range
 
-The final value is never allowed to fall below the computed high-speed floor. This prevents extreme rate multipliers from decreasing the estimated difficulty.
+The speed lift uses both logarithmic and linear rate terms:
 
-## 12. Graph Output
+```text
+rateIntensity = log2(speedRate) + 0.35 * max(0, speedRate - 1)
+baselineFloor = baseline + rateIntensity * gainPerDoubling
+```
 
-The numeric calculation uses unsmoothed `localRaw`. When graph output is requested, only the returned graph series is smoothed with a short weighted moving window. This keeps the displayed graph readable without changing the estimator result.
+`gainPerDoubling` depends on baseline difficulty, current sped density, hand interval pressure, chord rate, and speed stream aggregate. A mid-difficulty band-pass term strengthens the `10.5..17` range so high multipliers do not collapse after the meta model leaves its training distribution.
 
-## 13. Complexity
+The recursive anchor floor evaluates a lower speed rate with its own guard enabled, then adds a small positive local lift:
+
+```text
+anchorRate =
+  speedRate - 0.025  for speedRate <= 1.15
+  speedRate - 0.05   for speedRate <= 1.30
+  speedRate - 0.10   for speedRate <= 1.50
+  speedRate - 0.125  for speedRate <= 2.00
+  speedRate - 0.25   otherwise
+
+anchorFloor = Roxy(osuText, speedRate=anchorRate).numericDifficulty
+            + localAnchorLift(speedRate / anchorRate)
+```
+
+The guard uses an internal recursion depth cap and a per-call cache so repeated baseline/anchor probes do not recompute the same rate inside one top-level estimate.
+
+The extreme structural floor no longer activates merely because `speedRate > 1`; it only activates when:
+
+```text
+logRaw > rawMap.p98
+```
+
+The final guarded value is:
+
+```text
+final = clamp(
+  max(unguardedNumeric, baselineFloor, anchorFloor, referenceFloor, extremeStructuralFloor),
+  -2,
+  30
+)
+```
+
+The structural layer and meta feature values still stay in the original calibrated range. The wider final clamp only prevents high-rate estimates from being flattened at `20.00`.
+
+## 13. Label Soft Cap
+
+Roxy keeps numeric difficulty internally, but its RC label display is capped above `CloverWisp Theta high`:
+
+```text
+if numericDifficulty > 18.4:
+    estDiff = "> CloverWisp Theta high"
+else:
+    estDiff = numericToRcLabel(numericDifficulty)
+```
+
+This prevents Roxy from displaying `Iota` or higher labels while still allowing the numeric value and star value to reflect values above Theta high.
+
+## 14. Graph Output
+
+The numeric calculation uses Roxy's structural strain data. The returned `graph` field does not use Roxy's local strain series. When graph output is requested, Roxy returns the graph provided by its private Azusa call, which currently resolves to Azusa/Sunny graph data.
+
+## 15. Complexity
 
 Let `N` be the number of tap notes and `R` the number of merged rows.
 
@@ -312,6 +392,6 @@ Let `N` be the number of tap notes and `R` the number of merged rows.
 - entropy windows: `O(R)` with bounded mask tables
 - strain update and aggregation: `O(R)`
 - meta feature build and GBDT evaluation: bounded by model size
-- memory: `O(R)` when graph output is requested; otherwise dominated by parsed note and row arrays
+- memory: `O(R)` for rows and strain arrays, plus reference estimator memory
 
-Roxy is heavier than a single estimator because it uses Sunny, Daniel, and private Azusa references, but Sunny and Daniel are each computed at most once in the Roxy path.
+Roxy is heavier than a single estimator because it uses Sunny, Daniel, and private Azusa references, but Sunny and Daniel are each computed at most once in the normal Roxy path. High-rate calls add recursive baseline/anchor probes; those probes use a small cache and disable graph output.
