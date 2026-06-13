@@ -1,430 +1,152 @@
-# Roxy Estimator Documentation
+# Roxy 4K RC Difficulty Estimator
 
----
+Roxy is a synchronous 4-key regular-chain difficulty estimator for osu!mania. It combines a structural strain model with a compact meta calibration head. The structural layer reads the chart directly; the reference layer uses Sunny, Daniel, and a Roxy-private Azusa call as additional numeric signals. Roxy does not call Mixed or Companella.
 
-## 1. Overview
+## 1. Scope
 
-Roxy is a **4K RC meta-structural estimator** for osu!mania / VSRG beatmaps. It takes an osu!mania `.osu` beatmap text as input and outputs:
+Roxy is intended for 4K RC charts. It rejects maps that are outside its scope:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `estDiff` | string | Human-readable RC tier label, e.g. `Reform 9 low` |
-| `numericDifficulty` | number | Continuous RC value, clamped to `[-2, 20]` |
-| `star` | number | Linear mapped star value, `3.4 + 0.38 * numericDifficulty` |
-| `rawNumericDifficulty` | number | Structural numeric before the meta model output |
-| `debug` | object | Intermediate structure, references, stream summaries, corrections, and meta diagnostics |
+- empty or unparsable input
+- non-mania beatmaps
+- non-4K beatmaps
+- LN ratio above `0.18`
+- fewer than `80` tap notes
+- non-finite or non-positive speed rate
+- internal estimator errors
 
-The current production pipeline consists of **7 stages**:
+Invalid results use the same estimator result shape as valid results, but return no numeric difficulty.
+
+## 2. Pipeline
 
 ```text
-Parse -> Row Build -> Structural Strain -> Structural Numeric -> Reference Predictions -> Meta Model -> Label
+Parse .osu text
+  -> build 4K tap rows
+  -> compute row, hand, column, rhythm, entropy, and NPS features
+  -> update seven structural strain streams
+  -> aggregate streams into structural numeric difficulty
+  -> compute Sunny and Daniel once
+  -> call private Azusa with those precomputed references
+  -> build meta features from Azusa/Sunny/Daniel/Roxy
+  -> evaluate GBDT calibration head
+  -> apply high-speed monotonic guard
+  -> format RC label and optional smoothed graph
 ```
 
-Roxy is intentionally different from Azusa:
+The reference order is deliberately fixed:
 
-- Azusa is mostly a handcrafted RC estimator with reference blending.
-- Roxy first computes its own structural signals, then uses a generated GBDT meta model over Roxy features and existing estimator predictions.
-- Roxy currently reaches KPI1 on the local benchmark:
-  - `Exact = 99.07%`
-  - `Close+ = 99.84%`
-  - `Moderate = 0.16%`
-  - `Miss = 0`
+1. Reuse `precomputedSunnyResult` when available; otherwise compute Sunny once.
+2. Reuse `precomputedDanielResult` when available; otherwise compute Daniel once.
+3. Call Azusa with both precomputed results.
 
----
+This keeps Roxy, Azusa, Daniel, and Sunny aligned without recomputing Daniel or Sunny inside Azusa.
 
-## 2. Configuration Constants
+## 3. Basic Functions
 
-All structural parameters are centralized in `ROXY_CONFIG`.
-
-### 2.1 Input Constraints
-
-| Constant | Value | Description |
-|----------|------:|-------------|
-| `rcLnRatioLimit` | `0.18` | Maps with LN ratio above 18% are rejected |
-| `minNotes` | `80` | Minimum tap note count for stable RC estimation |
-| `rowToleranceMs` | `2` | Time tolerance for merging simultaneous notes into a row |
-| `entropyWindowMs` | `750` | Sliding mask/transition entropy window |
-| `npsWindowsMs` | `[250, 500, 1000, 4000]` | NPS windows used by stamina and diagnostics |
-
-### 2.2 Section Aggregation
-
-| Constant | Value | Description |
-|----------|------:|-------------|
-| `sectionMs` | `400` | Section width for section peak aggregation |
-| `sectionDecay` | `0.9` | Descending-section weight decay |
-
-### 2.3 Graph Smoothing
-
-| Constant | Value | Description |
-|----------|------:|-------------|
-| `graphSmoothingTauMs` | `650` | Time constant for graph-only bidirectional exponential smoothing |
-| `graphRawBlend` | `0.12` | Fraction of original graph signal mixed back after smoothing |
-
-### 2.4 Structural Raw Mapping
-
-| Constant | Value | Description |
-|----------|------:|-------------|
-| `rawMap.p02` | `3.9947` | Lower structural log-raw calibration point |
-| `rawMap.p98` | `7.5454` | Upper structural log-raw calibration point |
-| `correctionClamp` | `1.25` | Clamp for total structural correction |
-
-The raw mapping is:
+Roxy uses small bounded primitives instead of unbounded raw ratios.
 
 ```text
-rawAgg     = 0.80 * weightedAgg + 0.20 * sectionAgg
-logRaw     = ln(1 + max(0, rawAgg))
-preNumeric = clamp(linearMap(logRaw, p02, p98, -2, 20), -2.5, 21)
-```
+clamp(x, lo, hi) = min(max(x, lo), hi)
 
-### 2.5 Stream Weights
+g(x, a, b)  = clamp((x - a) / (b - a), 0, 1)
+gi(x, a, b) = clamp((b - x) / (b - a), 0, 1)
 
-| Stream | Weight | Purpose |
-|--------|-------:|---------|
-| `speed` | `0.22` | Global row speed and hand rate |
-| `handStream` | `0.18` | Per-hand stream / rotation pressure |
-| `jack` | `0.16` | Same-column repetition |
-| `chordjack` | `0.16` | Interaction between chord density and jack pressure |
-| `tech` | `0.12` | Rhythm, mask, and transition irregularity |
-| `stamina` | `0.11` | Sustained NPS and hand stamina |
-| `course` | `0.05` | Long-duration course-like stamina |
-
-### 2.6 Stream Decay Model
-
-Each stream has a burst state and a stamina state:
-
-```text
-burstState   = burstState   * exp(-dt / burstTau)   + input
-staminaState = staminaState * exp(-dt / staminaTau) + input
-
-streamValue = burstMix * burstState + (1 - burstMix) * staminaState
-```
-
-| Stream | `burstTau` | `staminaTau` | `burstMix` |
-|--------|-----------:|-------------:|-----------:|
-| `speed` | `220` | `1600` | `0.78` |
-| `handStream` | `260` | `2200` | `0.80` |
-| `jack` | `300` | `1800` | `0.88` |
-| `chordjack` | `260` | `2400` | `0.82` |
-| `tech` | `450` | `3200` | `0.70` |
-| `stamina` | `1200` | `10000` | `0.58` |
-| `course` | `30000` | `120000` | `0.35` |
-
----
-
-## 3. RC Label System
-
-Roxy uses the shared RC formatter in `rcDifficultyFormat.js`, the same label system extracted from Azusa.
-
-### 3.1 Tier Constants
-
-**`GREEK_BY_INDEX`**: Greek-like names for numeric bases 11-20.
-
-```text
-Alpha, Beta, Gamma, Delta, Epsilon, Emik Zeta,
-Thaumiel Eta, CloverWisp Theta, Iota, Kappa
-```
-
-**`RC_TIER_CANDIDATES`**:
-
-```text
-low (-0.4), mid/low (-0.2), mid (0), mid/high (+0.2), high (+0.4)
-```
-
-### 3.2 Mapping Rules
-
-| Numeric Base | Label Format |
-|--------------|--------------|
-| `<= 0` | `Intro 1` to `Intro 3` |
-| `1..10` | `Reform 1` to `Reform 10` |
-| `11..20` | `Alpha` to `Kappa` |
-
-`numericToRcLabel(numeric)` searches all `(base, tierOffset)` candidates and chooses the closest center.
-
-### 3.3 Reverse Parsing
-
-Roxy also uses `rcLabelToNumeric(label)` for reference estimators whose `numericDifficulty` is `null`.
-
-This is needed because Sunny often returns a valid RC label but no numeric value. A critical bug avoided here:
-
-```text
-Number(null) === 0
-```
-
-Roxy explicitly rejects `null`, `undefined`, and empty string before numeric conversion, then falls back to label parsing.
-
----
-
-## 4. Utility Functions
-
-### 4.1 `clamp(value, min, max)`
-
-Standard numeric clamp.
-
-### 4.2 `safeDiv(a, b, fallback)`
-
-Division with NaN / Inf / zero protection.
-
-### 4.3 `fmt4(value)`
-
-Formats finite debug values to 4 decimals. Returns `null` for non-finite values.
-
-### 4.4 `gate(value, min, max)`
-
-```text
-gate(x, a, b) = clamp((x - a) / (b - a), 0, 1)
-```
-
-### 4.5 `inverseGate(value, min, max)`
-
-```text
-inverseGate(x, a, b) = clamp((b - x) / (b - a), 0, 1)
-```
-
-### 4.6 `strainRate(dt, base, offset, power)`
-
-```text
-strainRate(dt, base, offset, power)
+r(dt, base, offset, power)
   = min(8, (base / max(16, dt + offset)) ^ power)
+
+decay(state, input, dt, tau)
+  = state * exp(-dt / tau) + input
 ```
 
-This is the primitive rate-to-strain curve used by speed, jack, hand, chord, and stamina features.
+`g` is a rising gate, `gi` is a falling gate, and `r` maps shorter intervals to larger strain with a hard cap.
 
-### 4.7 `decayState(state, input, dt, tau)`
+## 4. Row Model
+
+Each tap note is scaled by speed rate:
 
 ```text
-state * exp(-dt / tau) + input
+t = startTime / speedRate
 ```
 
-### 4.8 `piecewiseLinear(x, knots)`
+Notes within `2 ms` are merged into one row. Each row stores:
 
-Linear interpolation over sorted `[x, y]` knots. Used by the structural isotonic calibration table.
+- `mask`: 4-bit column mask
+- `rowSize`: number of active columns
+- `leftCount`, `rightCount`: notes on columns `0-1` and `2-3`
+- `dtRow`: interval from previous row
+- `dtSame[c]`: interval from previous note in column `c`
+- `dtHand[h]`: interval from previous active row on hand `h`
+- `handMask[h]`: active mask for each hand
+- `nps250`, `nps500`, `nps1000`, `nps4000`: rolling density windows
 
-### 4.9 `quantileFromSorted(sortedValues, q)`
+Hand split is fixed as columns `0-1` for left hand and `2-3` for right hand.
 
-Interpolated quantile from a sorted numeric array.
-
-### 4.10 `powerMean(values, p)`
-
-Generalized power mean, currently used with `p = 2.4` in stream summaries.
-
----
-
-## 5. Stage 1: Parsing and Validation
-
-### 5.1 `runRoxyEstimatorFromText(osuText, options)`
-
-Roxy accepts beatmap text and options:
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `speedRate` | `1.0` | Playback rate; note times are divided by this value |
-| `odFlag` | `null` | Forwarded to reference estimators |
-| `cvtFlag` | `null` | Supports `HO` / `IN` conversion |
-| `withGraph` | `false` | Whether to return graph data |
-
-### 5.2 Invalid Results
-
-`buildErrorResult(code, message, extras)` returns a standardized invalid object:
-
-```js
-{
-  star: NaN,
-  estDiff: "Invalid: <message>",
-  numericDifficulty: null,
-  numericDifficultyHint: code,
-  graph: null,
-  rawNumericDifficulty: null,
-  debug: { code, message }
-}
-```
-
-### 5.3 Validation Rules
-
-| Code | Condition |
-|------|-----------|
-| `EmptyInput` | Beatmap text is missing or empty |
-| `InvalidSpeedRate` | `speedRate` is non-finite or <= 0 |
-| `ParseFailed` | Parser reports failure |
-| `NotMania` | Beatmap is not osu!mania |
-| `UnsupportedKeys` | Column count is not 4 |
-| `UnsupportedLN` | LN ratio is above `0.18` |
-| `TooFewNotes` | Fewer than `80` RC tap notes or fewer than 2 rows |
-| `RoxyError` | Internal exception |
-
----
-
-## 6. Stage 2: Tap Rows
-
-### 6.1 `buildTapRows(parsed, speedRate, toleranceMs)`
-
-Roxy extracts only tap notes:
-
-```text
-if noteType has LN bit 128 -> skip
-```
-
-Each tap:
-
-```js
-{
-  t: startTime / speedRate,
-  c: column
-}
-```
-
-Taps are sorted by `(time, column)`.
-
-### 6.2 Row Merge
-
-Rows merge all taps within `2ms` of the row start:
-
-```text
-abs(tap.t - rowStartTime) <= 2
-```
-
-Each row contains:
-
-| Field | Description |
-|-------|-------------|
-| `t` | Row time |
-| `mask` | 4-bit column mask |
-| `rowSize` | Number of unique columns in the row |
-| `leftCount` | Number of notes in columns 0-1 |
-| `rightCount` | Number of notes in columns 2-3 |
-| `handMask` | `[leftMask, rightMask]` |
-
-Hand masks:
-
-```text
-leftMask  = mask & 0b0011
-rightMask = mask & 0b1100
-```
-
----
-
-## 7. Stage 3: Structural Curve (`computeRoxyCurve`)
-
-`computeRoxyCurve(rows, taps, activity)` is Roxy's core structural feature extraction stage.
-
-For every row, it computes:
-
-1. Time intervals:
-   - `dtRow`
-   - `dtSame[c]`
-   - `dtHand[h]`
-2. Hand pattern signals:
-   - `rotation[h]`
-   - `sameHandOverlap`
-   - `sameHandChord`
-3. Chord signals:
-   - `rowChord`
-   - `threeRate`
-4. Jack / anchor signals:
-   - `jackMax`
-   - `anchorRow`
-5. Entropy:
-   - `entropy750`
-   - `transitionEntropy750`
-6. NPS windows:
-   - `nps250`
-   - `nps500`
-   - `nps1000`
-   - `nps4000`
-7. Seven stream inputs:
-   - `speedIn`
-   - `handIn`
-   - `jackIn`
-   - `chordIn`
-   - `chordjackIn`
-   - `techIn`
-   - `staminaIn`
-   - `courseIn`
-
-### 7.1 Time Intervals
-
-```text
-dtRow     = currentRowTime - previousRowTime
-dtSame[c] = currentRowTime - lastColumnTime[c]
-dtHand[h] = currentRowTime - lastHandTime[h]
-```
-
-The first row uses `dtRow = 1000`.
-
-### 7.2 Rotation
+Important row-level features:
 
 ```text
 rotation[h] = 1
-```
+  when current hand mask and previous non-empty same-hand mask have no overlap
 
-when the current same-hand mask is non-empty and has no overlap with the previous same-hand non-empty mask.
+sameHandOverlap = (overlapLeft + overlapRight) / 2
 
-### 7.3 Chord Features
-
-```text
 rowChord = (rowSize - 1) / 3
-sameHandChord = (max(0, leftCount - 1) + max(0, rightCount - 1)) / 2
+
+sameHandChord =
+  (max(0, leftCount - 1) + max(0, rightCount - 1)) / 2
+
+rhythmChaos =
+  min(2, abs(log2((dtRow + 24) / (prevDtRow + 24)))) / 2
 ```
 
-### 7.4 Entropy Window
+Two entropy windows are maintained over `750 ms`:
 
-Roxy maintains a 750ms sliding queue with:
+- `entropy750`: frequency entropy of the 16 possible row masks
+- `transitionEntropy750`: frequency entropy of 256 possible `prevMask -> mask` transitions
 
-| Table | Buckets | Meaning |
-|-------|---------|---------|
-| `maskCounts` | 16 | Frequency of row masks |
-| `transitionCounts` | 256 | Frequency of `prevMask -> mask` transitions |
+## 5. Structural Inputs
 
-Normalized entropy:
+Roxy converts every row into seven input signals.
 
-```text
-entropy750 = entropy(maskCounts) / 4
-transitionEntropy750 = entropy(transitionCounts) / 8
-```
-
----
-
-## 8. Stage 3 Inputs: Seven Strain Signals
-
-### 8.1 Speed
+### Speed
 
 ```text
 speedIn =
-  0.55 * strainRate(dtRow, 155, 30, 1.06)
-+ 0.30 * max_h strainRate(dtHand[h], 180, 40, 1.08)
-+ 0.15 * mean_h strainRate(dtHand[h], 180, 40, 1.08)
+  0.55 * r(dtRow, 155, 30, 1.06)
++ 0.30 * max_h r(dtHand[h], 180, 40, 1.08)
++ 0.15 * mean_h r(dtHand[h], 180, 40, 1.08)
 ```
 
-### 8.2 Jack
+Speed is based on row interval and hand interval, not directly on NPS.
+
+### Jack
 
 ```text
-anchorRow = 1 if any dtSame[c] <= 220 else 0
+anchorRow = 1 if any dtSame[c] <= 220 ms else 0
 
 jackIn =
-  max_c strainRate(dtSame[c], 185, 35, 1.18)
+  max_c r(dtSame[c], 185, 35, 1.18)
 * (1 + 0.20 * rowChord + 0.15 * anchorRow)
 ```
 
-### 8.3 Hand Stream
+### Hand Stream
 
 ```text
-handIn = max_h(
-  0.70 * strainRate(dtHand[h], 180, 38, 1.10)
-+ 0.30 * rotation[h] * strainRate(dtHand[h], 205, 45, 1.05)
-)
+handIn =
+  max_h (
+    0.70 * r(dtHand[h], 180, 38, 1.10)
+  + 0.30 * rotation[h] * r(dtHand[h], 205, 45, 1.05)
+  )
 ```
 
-### 8.4 Chord
+### Chord
 
 ```text
-body = max(0, rowSize - 2) * strainRate(dtRow, 150, 80, 0.85)
-
 chordIn =
   rowChord * (1 + 0.18 * speedIn)
 + 0.22 * sameHandChord
-+ body
++ max(0, rowSize - 2) * r(dtRow, 150, 80, 0.85)
 ```
 
-### 8.5 Chordjack
+### Chordjack
 
 ```text
 chordjackIn =
@@ -435,704 +157,161 @@ chordjackIn =
   )
 ```
 
-### 8.6 Tech
+### Tech
 
 ```text
-rhythmChaos =
-  min(2, abs(log2((dtRow + 24) / (prevDtRow + 24)))) / 2
-
 techIn =
   0.32 * rhythmChaos
 + 0.24 * entropy750
 + 0.24 * transitionEntropy750
-+ 0.20 * (mask !== prevMask ? 1 : 0)
++ 0.20 * (mask != prevMask ? 1 : 0)
 ```
 
-### 8.7 Stamina
-
-Per-hand stamina state:
+### Stamina
 
 ```text
 handStamina[h] =
-  decayState(handStamina[h],
-             strainRate(dtHand[h], 180, 40, 1.08),
-             dtHand[h],
-             8000)
-```
+  decay(handStamina[h], r(dtHand[h], 180, 40, 1.08), dtHand[h], 8000)
 
-Input:
-
-```text
 staminaIn =
   0.40 * log1p(nps1000) / log(24)
 + 0.35 * log1p(nps4000) / log(24)
-+ 0.25 * maxHandStamina
++ 0.25 * max(handStamina[0], handStamina[1])
 ```
 
-### 8.8 Course
+## 6. Strain Streams
+
+Each structural input updates a burst and sustain state. The stream output is a weighted mix of those states.
+
+| Stream | Burst tau | Sustain tau | Burst weight | Sustain weight |
+|---|---:|---:|---:|---:|
+| speed | 220 | 1600 | 0.78 | 0.22 |
+| hand | 260 | 2200 | 0.80 | 0.20 |
+| jack | 300 | 1800 | 0.88 | 0.12 |
+| chordjack | 260 | 2400 | 0.82 | 0.18 |
+| tech | 450 | 3200 | 0.70 | 0.30 |
+| stamina | 1200 | 10000 | 0.58 | 0.42 |
+| course | 30000 | 120000 | 0.35 | 0.65 |
+
+The local raw strain is the weighted sum of stream outputs:
 
 ```text
-courseIn =
-  staminaIn
-* gate(activeDurationSec, 90, 300)
-* (1 - 0.25 * gate(breakDensity, 0.006, 0.018))
+localRaw =
+  0.22 * speed
++ 0.18 * hand
++ 0.16 * jack
++ 0.16 * chordjack
++ 0.12 * tech
++ 0.11 * stamina
++ 0.05 * course
 ```
 
----
-
-## 9. Stage 4: Structural Numeric (`computeRoxyNumeric`)
-
-### 9.1 Stream Summary
-
-For each stream series:
-
-| Statistic | Meaning |
-|-----------|---------|
-| `q50` | Median |
-| `q75` | Sustained upper quartile |
-| `q90` | High difficulty area |
-| `q97` | Peak difficulty |
-| `tailMean` | Mean of top 4% |
-| `powerMean` | Power mean with `p = 2.4` |
-
-Aggregate formula:
-
-```text
-aggregate =
-  0.30 * q97
-+ 0.22 * q90
-+ 0.18 * tailMean
-+ 0.15 * q75
-+ 0.10 * powerMean
-+ 0.05 * q50
-```
-
-### 9.2 Weighted Aggregate
-
-```text
-weightedAgg = sum(streamWeight[k] * aggregate[k])
-```
-
-### 9.3 Section Peak Aggregate
-
-Roxy divides the chart into 400ms sections, takes the maximum `localRaw` per section, sorts section peaks descending, and applies:
-
-```text
-sectionAgg = sum(v[i] * 0.9^i) / sum(0.9^i)
-```
-
-### 9.4 Structural Raw Mapping
-
-```text
-rawAgg = 0.80 * weightedAgg + 0.20 * sectionAgg
-logRaw = ln(1 + max(0, rawAgg))
-preNumeric = clamp(linearMap(logRaw, 3.9947, 7.5454, -2, 20), -2.5, 21)
-```
-
-### 9.5 Structural Corrections
-
-Roxy applies 9 structural corrections and clamps their sum to `[-1.25, 1.25]`.
-
-| Correction | Purpose |
-|------------|---------|
-| `lowCj` | Boost low-speed, high-overlap chordjack |
-| `highStream` | Boost high-rotation fast stream |
-| `highCjDamp` | Dampen very dense non-fast chordjack |
-| `courseBreakDamp` | Dampen long broken course maps |
-| `courseSustainLift` | Boost sustained long maps |
-| `denseJsLift` | Boost dense jumpstream-like structures |
-| `denseJsDamp` | Dampen dense low-rotation patterns |
-| `anchorLift` | Boost anchor/fast-jack patterns |
-| `handBiasLift` | Boost one-hand-biased fast patterns |
-
-Final structural score:
-
-```text
-rawNumeric = preNumeric + corrections.total
-structuralNumeric = piecewiseLinear(rawNumeric, isotonicKnots)
-```
-
-The structural score is not the final Roxy output unless the meta model fails. It is an input feature and a fallback.
-
----
-
-## 10. Stage 5: Reference Predictions
-
-**Function**: `buildReferencePredictions(osuText, options, structuralNumeric)`
-
-Roxy computes several reference predictions:
-
-| Reference | Source |
-|-----------|--------|
-| `Azusa` | `runAzusaEstimatorFromText` |
-| `Sunny` | `runSunnyEstimatorFromText` |
-| `Daniel` | `runDanielEstimatorFromText` |
-| `Mixed` | `runMixedEstimatorFromText` |
-| `Companella` | Currently Sunny numeric as a synchronous placeholder |
-| `Roxy` | Structural numeric from Roxy itself |
-
-Reference options force `withGraph: false` to avoid unnecessary graph work.
-
-Sunny is computed first and passed into Azusa and Mixed:
-
-```js
-runAzusaEstimatorFromText(osuText, {
-  ...referenceOptions,
-  precomputedSunnyResult: sunnyResult
-});
-
-runMixedEstimatorFromText(osuText, {
-  ...referenceOptions,
-  precomputedSunnyResult: sunnyResult
-});
-```
-
-This avoids one repeated Sunny computation.
-
-### 10.1 Numeric Extraction
-
-`resultNumeric(result)`:
-
-1. Uses `result.numericDifficulty` if it is a real finite value.
-2. Otherwise parses `result.estDiff` with `rcLabelToNumeric`.
-3. Returns `null` if no valid numeric can be recovered.
-
-Labels containing `<` or `>` are considered invalid for numeric parsing.
-
----
-
-## 11. Stage 6: Meta Feature Vector
-
-**Function**: `buildRoxyMetaFeatures(referencePredictions, numericDetails, curve, structuralNumeric)`
-
-The generated model expects exactly **119 features** in the order defined by `ROXY_META_FEATURE_NAMES`.
-
-### 11.1 Reference Value Features
-
-For each reference algorithm:
-
-```text
-pred_Azusa, has_Azusa
-pred_Sunny, has_Sunny
-pred_Daniel, has_Daniel
-pred_Mixed, has_Mixed
-pred_Companella, has_Companella
-pred_Roxy, has_Roxy
-```
-
-### 11.2 Reference Summary Features
-
-```text
-pred_min
-pred_max
-pred_mean
-pred_median
-pred_range
-```
-
-### 11.3 Pairwise Difference Features
-
-```text
-diff_Azusa_Daniel, absdiff_Azusa_Daniel
-diff_Azusa_Sunny, absdiff_Azusa_Sunny
-diff_Azusa_Mixed, absdiff_Azusa_Mixed
-diff_Azusa_Roxy, absdiff_Azusa_Roxy
-diff_Daniel_Sunny, absdiff_Daniel_Sunny
-diff_Daniel_Mixed, absdiff_Daniel_Mixed
-diff_Mixed_Roxy, absdiff_Mixed_Roxy
-diff_Sunny_Roxy, absdiff_Sunny_Roxy
-```
-
-### 11.4 Structural Numeric Features
-
-```text
-roxy_logRaw
-roxy_rawAgg
-roxy_preNumeric
-roxy_rawNumeric
-roxy_finalNumeric
-```
-
-Important: despite the name, `roxy_finalNumeric` is the **structural numeric** at runtime. It is not the GBDT output. The training script must also use `structuralNumeric`; otherwise the model leaks previous predictions and becomes unstable.
-
-### 11.5 Correction Features
-
-```text
-corr_lowCj
-corr_highStream
-corr_highCjDamp
-corr_courseBreakDamp
-corr_courseSustainLift
-corr_denseJsLift
-corr_denseJsDamp
-corr_anchorLift
-corr_handBiasLift
-corr_total
-```
-
-### 11.6 Stream Summary Features
+## 7. Aggregation
 
 For each stream:
 
 ```text
-speed, handStream, jack, chordjack, tech, stamina, course
+A =
+  0.30 * q97
++ 0.22 * q90
++ 0.18 * tailMeanTop4%
++ 0.15 * q75
++ 0.10 * powerMean(p = 2.4)
++ 0.05 * q50
 ```
 
-Roxy emits:
+Roxy also computes a fixed `400 ms` section peak aggregation over `localRaw`:
 
 ```text
-aggregate, q97, q90, q75, q50, tailMean, powerMean
+sectionAgg = sum(sortedPeak[i] * 0.9^i) / sum(0.9^i)
 ```
 
-This contributes `7 * 7 = 49` features.
-
-### 11.7 Global Statistics Features
+The raw structural score is:
 
 ```text
-stat_activeDurationSec
-stat_breakCount
-stat_breakDensity
-stat_avgNps
-stat_chordRate
-stat_threeRate
-stat_overlapRate
-stat_rotationRate
-stat_sameHandQ10
-stat_fastJackRate
-stat_anchorRate
-stat_anchorImbalance
-stat_handBias
-stat_peakToSustainGap
-stat_rows
-stat_taps
+rawAgg = 0.80 * weightedAgg + 0.20 * sectionAgg
+logRaw = ln(1 + max(0, rawAgg))
+preNumeric = linearMap(logRaw, p02, p98, -2, 20)
 ```
 
-### 11.8 Interaction Features
+The pre-numeric value is corrected structurally, passed through an isotonic mapping, then clamped to the RC numeric range.
+
+## 8. Global Statistics
+
+Roxy measures chart-wide shape to adjust local strain:
 
 ```text
-logAvgNps
-logDuration
-chordFast
-chordOverlap
-rotationInvQ10
-breakPeak
+activeDurationSec = (lastT - firstT - inactiveMs) / 1000
+inactiveMs = sum(gap - 1000 for gap > 1000)
+breakDensity = breakCount / max(activeDurationSec / 60, 1)
+avgNps = tapCount / max(activeDurationSec, 1)
+handBias = abs(leftLoad - rightLoad) / max(leftLoad, rightLoad, 1e-6)
 ```
 
----
+Other statistics include chord rate, triple rate, same-hand overlap rate, rotation rate, same-hand interval Q10, fast jack rate, anchor rate, anchor imbalance, and peak-to-sustain gap.
 
-## 12. Stage 7: GBDT Meta Model
+## 9. Structural Corrections
 
-**File**: `roxyMetaModel.generated.js`
+The correction layer handles pattern families that are not well represented by a single strain sum:
 
-The model is generated by `temp/roxy_meta_probe.py` and should not be edited manually.
+- low-density chordjack lift
+- high-speed stream lift
+- very dense high-chord damping
+- long course break damping
+- sustained course lift
+- dense jumpstream lift and damping
+- anchor jack lift
+- hand-bias lift
 
-### 12.1 Model Constants
+The total correction is clamped before the isotonic mapping.
 
-| Constant | Value |
-|----------|------:|
-| Feature count | `119` |
-| Tree count | `500` |
-| Base value | `12.648447205` |
-| Learning rate | `0.04` |
-| Output clamp | `[-2, 20]` |
-| Model file size | about `180 KB` |
+## 10. Meta Calibration
 
-### 12.2 Tree Format
+The meta layer receives four numeric sources:
 
-Internal node:
+| Source | Meaning |
+|---|---|
+| Azusa | Private Azusa result using Roxy's precomputed Sunny and Daniel references |
+| Sunny | General estimator reference, computed once or supplied by caller |
+| Daniel | 4K RC reference, computed once or supplied by caller |
+| Roxy | Roxy structural numeric before meta calibration |
 
-```text
-[featureIndex, threshold, leftNode, rightNode]
-```
+Feature groups:
 
-Leaf node:
+- `pred_*` and `has_*` for each source
+- min, max, mean, median, and range over available predictions
+- pairwise differences for `Azusa/Daniel`, `Azusa/Sunny`, `Azusa/Roxy`, `Daniel/Sunny`, `Daniel/Roxy`, and `Sunny/Roxy`
+- structural numeric details
+- correction terms
+- stream summaries
+- global statistics and small interaction features
 
-```text
-number
-```
+Unavailable references are encoded as `has = 0` and `pred = 0`. The GBDT head returns the final calibrated numeric value.
 
-### 12.3 Evaluation
+## 11. High-Speed Guard
 
-```js
-let value = ROXY_META_BASE;
+For `speedRate > 1`, Roxy applies an additional monotonic guard. The guard compares the meta value against:
 
-for (const tree of ROXY_META_TREES) {
-  value += ROXY_META_LEARNING_RATE * treeValue(tree, features);
-}
+- the unsped baseline estimate
+- available reference predictions
+- an extreme structural floor derived from `logRaw`
+- a speed-rate lift derived from `log2(speedRate)`
 
-return clamp(value, -2, 20);
-```
+The final value is never allowed to fall below the computed high-speed floor. This prevents extreme rate multipliers from decreasing the estimated difficulty.
 
-If the meta value is non-finite, Roxy falls back to the structural numeric:
+## 12. Graph Output
 
-```text
-finalNumeric = finite(metaNumeric) ? metaNumeric : structuralNumeric
-```
+The numeric calculation uses unsmoothed `localRaw`. When graph output is requested, only the returned graph series is smoothed with a short weighted moving window. This keeps the displayed graph readable without changing the estimator result.
 
-### 12.4 High Speed-Rate Guard
+## 13. Complexity
 
-For `speedRate > 1`, Roxy does not trust the raw GBDT output directly. The meta model is trained on normal benchmark timings, and at extreme rate multipliers some reference estimators can become unavailable while the tree model falls into out-of-distribution leaves. This previously allowed high-difficulty maps to drop from about 18 to about 15.5 when applying a speed multiplier.
+Let `N` be the number of tap notes and `R` the number of merged rows.
 
-Roxy now switches the final high-rate output to a monotonic guard:
+- parsing and row construction: `O(N)`
+- rolling NPS windows: `O(R)` with two pointers
+- entropy windows: `O(R)` with bounded mask tables
+- strain update and aggregation: `O(R)`
+- meta feature build and GBDT evaluation: bounded by model size
+- memory: `O(R)` when graph output is requested; otherwise dominated by parsed note and row arrays
 
-```text
-baseline = Roxy(osuText, speedRate=1.0, _skipRoxySpeedRateGuard=true)
-rateGain = log2(speedRate)
-
-gainPerDoubling =
-  1.00
-+ 1.10 * gate(baseline, 10, 18)
-+ 0.45 * gate(avgNps, 22, 50)
-+ 0.35 * inverseGate(sameHandQ10, 25, 80)
-+ 0.20 * gate(chordRate, 0.25, 0.55)
-
-baselineFloor = baseline + rateGain * gainPerDoubling
-extremeStructuralFloor = clamp(16.0 + 2.35 * max(0, logRaw - rawMap.p98) + 0.45 * rateGain, -2, 20)
-
-finalNumeric = clamp(max(baselineFloor, extremeStructuralFloor), -2, 20)
-```
-
-The unguarded meta value is still exposed in debug as `unguardedNumeric` / `metaNumeric`. The final clamp remains `20` because the current RC label system only defines labels through `Kappa high`.
-
-### 12.5 Graph Smoothing
-
-Roxy's numeric calculation uses the raw `localRaw` row strain. Only the returned `graph` field is smoothed when `withGraph === true`.
-
-The graph pipeline is:
-
-```text
-localRaw row values
--> 3-point median filter
--> forward exponential smoothing, tau = 650ms
--> backward exponential smoothing, tau = 650ms
--> 0.12 raw + 0.88 smoothed blend
--> graph.values
-```
-
-This removes row-level visual spikes without changing `numericDifficulty`, `rawNumericDifficulty`, stream summaries, or meta features.
-
----
-
-## 13. Debug Output
-
-Successful Roxy output includes:
-
-```js
-debug: {
-  notes,
-  rows,
-  rawAgg,
-  logRaw,
-  preNumeric,
-  rawNumeric,
-  structuralNumeric,
-  metaNumeric,
-  finalNumeric,
-  meta: {
-    featureCount,
-    references
-  },
-  stats,
-  corrections,
-  streams
-}
-```
-
-`meta.references` records the numeric value recovered from each reference estimator:
-
-```js
-{
-  Azusa,
-  Sunny,
-  Daniel,
-  Mixed,
-  Companella,
-  Roxy
-}
-```
-
-Unavailable references are shown as `null` in debug formatting.
-
----
-
-## 14. Benchmark and Training
-
-### 14.1 Benchmark Runner
-
-Roxy has a dedicated runner:
-
-```text
-docs/runner/benchmark-roxy.mjs
-docs/runner/run-roxy-benchmark.ps1
-```
-
-Run:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\docs\runner\run-roxy-benchmark.ps1
-```
-
-Outputs:
-
-| File | Description |
-|------|-------------|
-| `docs/data/Roxy.csv` | Per-map benchmark output |
-| `temp/Roxy-metrics.json` | Aggregate metrics |
-| `temp/Roxy-debug.json` | Debug rows, excluding graph data |
-| `docs/data/index.json` | Data index update |
-
-### 14.2 Training Script
-
-```text
-temp/roxy_meta_probe.py
-```
-
-The script:
-
-1. Reads benchmark CSV files from `docs/data`.
-2. Reads `temp/Roxy-debug.json`.
-3. Aligns debug rows by `(bid, name, pattern, subPattern, expected)`.
-4. Builds the 119-feature matrix.
-5. Compares Ridge and GBDT probes.
-6. Emits `roxyMetaModel.generated.js`.
-
-Emit command:
-
-```powershell
-python -u temp/roxy_meta_probe.py --emit-js
-```
-
-### 14.3 Critical Training Invariants
-
-1. Do not align debug rows by array index. Roxy skips LN rows, so index alignment drifts.
-2. `roxy_finalNumeric` in the feature schema must use structural numeric, not previous meta output.
-3. Reference parsing must match runtime behavior.
-4. Regenerate the model after changing reference estimators, structural features, or label parsing.
-
----
-
-## 15. Final Benchmark Metrics
-
-Final local benchmark result:
-
-| Metric | Value |
-|--------|------:|
-| Numeric rows | `644` |
-| Status / skipped rows | `102` |
-| Exact | `638` (`99.07%`) |
-| Close | `5` |
-| Close+ | `643` (`99.84%`) |
-| Moderate | `1` (`0.16%`) |
-| Miss | `0` (`0%`) |
-| KPI1 | `PASS` |
-
-Azusa baseline at the same benchmark state:
-
-| Metric | Value |
-|--------|------:|
-| Numeric rows | `644` |
-| Exact | `268` (`41.61%`) |
-| Close+ | `516` (`80.12%`) |
-| Moderate | `96` (`14.91%`) |
-| Miss | `32` (`4.97%`) |
-
-Roxy therefore passes KPI1 on the local benchmark and also passes all lower KPI requirements.
-
----
-
-## 16. Algorithm Complexity
-
-Let:
-
-- `n` = tap note count
-- `r` = row count
-- `s` = section count
-
-### 16.1 Structural Layer
-
-| Step | Complexity |
-|------|------------|
-| Tap extraction | `O(n)` |
-| Tap sorting | `O(n log n)` |
-| Row merge | `O(n)` |
-| NPS windows | `O(n + r)` |
-| Entropy windows | `O(r)` amortized |
-| Stream updates | `O(r)` |
-| Stream summaries | `O(r log r)` per stream |
-| Section aggregate | `O(r + s log s)` |
-
-Overall structural complexity:
-
-```text
-O(n log n + r log r)
-```
-
-### 16.2 Reference Layer
-
-Roxy also computes Sunny, Azusa, Daniel, and Mixed. These dominate runtime more than the GBDT itself.
-
-Optimizations already present:
-
-- Sunny result is passed to Azusa.
-- Sunny result is passed to Mixed.
-- Reference graph output is disabled.
-- For `speedRate > 1`, Roxy also computes one internal `speedRate=1.0` baseline for the monotonic speed-rate guard. This roughly doubles Roxy cost only for high-rate calls.
-
-Remaining optimization opportunity:
-
-- Mixed can still duplicate some Azusa / Daniel work internally. Passing more precomputed references would reduce runtime.
-
-### 16.3 Meta Model
-
-The generated GBDT uses:
-
-```text
-500 trees * depth <= 4
-```
-
-This is roughly two thousand comparisons and additions. Model evaluation remains negligible compared with parsing and reference estimators.
-
-### 16.4 Space Complexity
-
-Structural analysis stores:
-
-- taps: `O(n)`
-- rows: `O(r)`
-- seven stream arrays: `O(7r)`
-- graph arrays when requested: `O(r)`
-- debug summaries: `O(1)` plus optional arrays in graph
-
-Overall:
-
-```text
-O(n + r)
-```
-
----
-
-## 17. Browser Compatibility
-
-Roxy is implemented as pure JavaScript ES modules:
-
-- no Node.js APIs in runtime estimator code
-- no DOM access
-- no `window` / `document`
-- no direct WASM or ONNX loading
-
-This keeps it compatible with:
-
-- tosu browser overlay
-- Web Worker execution
-- Node benchmark runner
-
-The dedicated benchmark runner is Node-only, but the estimator itself is shared browser-safe code.
-
----
-
-## 18. Integration Notes
-
-Roxy is registered in:
-
-| File | Change |
-|------|--------|
-| `config.js` | Adds `Roxy` to estimator options |
-| `settings.json` | Adds `Roxy` to user-facing estimator choices |
-| `settingsParser.js` | Parses `"roxy"` as `"Roxy"` |
-| `compute.worker.js` | Adds worker support and invalid fallback |
-| `analysis.js` | Adds app-level Roxy branch |
-
-Fallback behavior:
-
-- If Roxy returns invalid, Sunny is used as fallback.
-- Worker returns `actualEstimatorAlgorithm`.
-- App layer uses this value to avoid showing `Roxy` when the actual estimate came from Sunny.
-
----
-
-## 19. Limitations and Risks
-
-### 19.1 Generalization Risk
-
-Roxy passes the full local benchmark, but group-split probes were weaker than full benchmark metrics. This means the generated meta head is benchmark-distribution-sensitive.
-
-Current recommendation:
-
-- Roxy is valid as an experimental high-accuracy 4K RC estimator.
-- Do not automatically promote it to Mixed default without external chart validation.
-
-### 19.2 Dependency Risk
-
-Roxy depends on the numeric behavior of:
-
-- Sunny
-- Azusa
-- Daniel
-- Mixed
-
-Any major change to those estimators can shift Roxy's meta feature distribution. After such changes, rerun benchmark and regenerate the model if necessary.
-
-### 19.3 Runtime Cost
-
-Roxy is heavier than Azusa because it runs several reference estimators. It is acceptable for single-map overlay use, but slower in full benchmark runs.
-
-### 19.4 Companella Placeholder
-
-`pred_Companella` currently uses Sunny as a synchronous placeholder. Real Companella uses async ONNX/WASM flow and is not called inside Roxy.
-
----
-
-## 20. Maintenance Workflow
-
-Recommended workflow after modifying Roxy or any reference estimator:
-
-1. Run Roxy benchmark:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\docs\runner\run-roxy-benchmark.ps1
-```
-
-2. Probe model/training behavior:
-
-```powershell
-python -u temp/roxy_meta_probe.py
-```
-
-3. Regenerate model if metrics improve or features changed:
-
-```powershell
-python -u temp/roxy_meta_probe.py --emit-js
-```
-
-4. Run full benchmark again.
-
-5. Confirm KPI1:
-
-```text
-Exact >= 98%
-Miss = 0
-```
-
-6. Run syntax checks:
-
-```powershell
-node --check "ManiaMapAnalyser by Leo_Black/js/estimator/roxyEstimator.js"
-node --check "ManiaMapAnalyser by Leo_Black/js/estimator/roxyMetaModel.generated.js"
-node --check "ManiaMapAnalyser by Leo_Black/js/estimator/rcDifficultyFormat.js"
-node --check "ManiaMapAnalyser by Leo_Black/js/estimator/mixedEstimator.js"
-node --check "ManiaMapAnalyser by Leo_Black/js/app/worker/compute.worker.js"
-node --check "ManiaMapAnalyser by Leo_Black/js/app/analysis.js"
-node --check "docs/runner/benchmark-roxy.mjs"
-```
-
----
-
-## 21. Future Improvements
-
-Potential improvements:
-
-1. Pass precomputed Azusa and Daniel results into Mixed to reduce duplicate work.
-2. Replace the synchronous `pred_Companella = Sunny` placeholder with a true async Companella feature in a main-thread-only variant.
-3. Add an external chart validation set to measure generalization.
-4. Improve the structural estimator so the meta model depends less on existing estimators.
-5. Store model metadata: training data hash, feature schema version, full metrics, split metrics, and generation timestamp.
-6. Report subpattern metrics, especially for course, dense chordjack, anchor chordjack, high stream, and low stream.
+Roxy is heavier than a single estimator because it uses Sunny, Daniel, and private Azusa references, but Sunny and Daniel are each computed at most once in the Roxy path.

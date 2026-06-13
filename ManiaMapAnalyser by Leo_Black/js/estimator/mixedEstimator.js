@@ -1,6 +1,7 @@
 import { runDanielEstimatorFromText } from "./danielEstimator.js";
 import { runSunnyEstimatorFromText } from "./sunnyEstimator.js";
 import { runAzusaEstimatorFromText } from "./azusaEstimator.js";
+import { runRoxyEstimatorFromText } from "./roxyEstimator.js";
 
 const MIXED_SUPPORTED_KEYS = new Set([4, 6, 7]);
 
@@ -88,7 +89,15 @@ function tryRunAzusaFallback(osuText, options) {
     }
 }
 
-function canUseAzusaResult(result) {
+function tryRunRoxyFallback(osuText, options) {
+    try {
+        return runRoxyEstimatorFromText(osuText, options);
+    } catch {
+        return null;
+    }
+}
+
+function canUseRcResult(result) {
     if (!result || Number(result.columnCount) !== 4) {
         return false;
     }
@@ -128,13 +137,22 @@ export function runMixedEstimatorFromText(osuText, options = {}) {
     let companellaPlan = null;
 
     if (mixedModeTag === "RC") {
-        if (!inEnabled) {
+        const roxyResult = tryRunRoxyFallback(osuText, {
+            ...options,
+            precomputedSunnyResult: sunnyBaseline,
+        });
+        if (canUseRcResult(roxyResult)) {
+            selectedRework = roxyResult;
+            estDiff = roxyResult.estDiff;
+            numericDifficulty = roxyResult.numericDifficulty;
+            numericDifficultyHint = roxyResult.numericDifficultyHint;
+        } else if (!inEnabled) {
             const azusaResult = tryRunAzusaFallback(osuText, {
                 ...options,
                 forceSunnyReferenceHo: false,
                 precomputedSunnyResult: sunnyBaseline,
             });
-            if (canUseAzusaResult(azusaResult)) {
+            if (canUseRcResult(azusaResult)) {
                 selectedRework = azusaResult;
                 estDiff = azusaResult.estDiff;
                 numericDifficulty = azusaResult.numericDifficulty;

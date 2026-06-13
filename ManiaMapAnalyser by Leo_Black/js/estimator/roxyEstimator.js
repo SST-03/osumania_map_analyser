@@ -1,7 +1,6 @@
 import { OsuFileParser } from "../parser/osuFileParser.js";
 import { runAzusaEstimatorFromText } from "./azusaEstimator.js";
 import { runDanielEstimatorFromText } from "./danielEstimator.js";
-import { runMixedEstimatorFromText } from "./mixedEstimator.js";
 import { evaluateRoxyMetaModel, ROXY_META_FEATURE_NAMES } from "./roxyMetaModel.generated.js";
 import { numericToRcLabel, rcLabelToNumeric } from "./rcDifficultyFormat.js";
 import { runSunnyEstimatorFromText } from "./sunnyEstimator.js";
@@ -825,7 +824,7 @@ function computeRoxyNumeric(curve) {
     };
 }
 
-const ROXY_META_ALGOS = Object.freeze(["Azusa", "Sunny", "Daniel", "Mixed", "Companella", "Roxy"]);
+const ROXY_META_ALGOS = Object.freeze(["Azusa", "Sunny", "Daniel", "Roxy"]);
 
 function toFeatureNumber(value) {
     const numeric = Number(value);
@@ -849,9 +848,17 @@ function resultNumeric(result) {
 function safeReference(run) {
     try {
         const result = run();
-        return resultNumeric(result) == null ? null : result;
+        return result || {
+            star: Number.NaN,
+            estDiff: "Invalid: Empty reference result",
+            numericDifficulty: null,
+        };
     } catch {
-        return null;
+        return {
+            star: Number.NaN,
+            estDiff: "Invalid: Reference estimator failed",
+            numericDifficulty: null,
+        };
     }
 }
 
@@ -861,23 +868,19 @@ function buildReferencePredictions(osuText, options, structuralNumeric) {
         withGraph: false,
     };
 
-    const sunnyResult = safeReference(() => runSunnyEstimatorFromText(osuText, referenceOptions));
+    const precomputedSunnyResult = options?.precomputedSunnyResult || null;
+    const precomputedDanielResult = options?.precomputedDanielResult || null;
+    const sunnyResult = precomputedSunnyResult || safeReference(() => runSunnyEstimatorFromText(osuText, referenceOptions));
+    const danielResult = precomputedDanielResult || safeReference(() => runDanielEstimatorFromText(osuText, referenceOptions));
     const azusaResult = safeReference(() => runAzusaEstimatorFromText(osuText, {
         ...referenceOptions,
         precomputedSunnyResult: sunnyResult,
+        precomputedDanielResult: danielResult,
     }));
-    const danielResult = safeReference(() => runDanielEstimatorFromText(osuText, referenceOptions));
-    const mixedResult = safeReference(() => runMixedEstimatorFromText(osuText, {
-        ...referenceOptions,
-        precomputedSunnyResult: sunnyResult,
-    }));
-
     return {
         Azusa: resultNumeric(azusaResult),
         Sunny: resultNumeric(sunnyResult),
         Daniel: resultNumeric(danielResult),
-        Mixed: resultNumeric(mixedResult),
-        Companella: resultNumeric(sunnyResult),
         Roxy: Number.isFinite(structuralNumeric) ? structuralNumeric : null,
     };
 }
@@ -915,11 +918,9 @@ function buildRoxyMetaFeatures(referencePredictions, numericDetails, curve, stru
     const pairs = [
         ["Azusa", "Daniel"],
         ["Azusa", "Sunny"],
-        ["Azusa", "Mixed"],
         ["Azusa", "Roxy"],
         ["Daniel", "Sunny"],
-        ["Daniel", "Mixed"],
-        ["Mixed", "Roxy"],
+        ["Daniel", "Roxy"],
         ["Sunny", "Roxy"],
     ];
     for (const [left, right] of pairs) {
@@ -1079,6 +1080,7 @@ function applySpeedRateGuard(osuText, options, speedRate, unguardedNumeric, nume
             ...options,
             speedRate: 1.0,
             withGraph: false,
+            precomputedSunnyResult: null,
             _skipRoxySpeedRateGuard: true,
         });
         const baselineNumeric = Number(baselineResult?.numericDifficulty);
