@@ -87,7 +87,8 @@ const STREAM_INPUT_BY_NAME = Object.freeze({
 const ROXY_THETA_HIGH_NUMERIC = 18.4;
 const ROXY_THETA_HIGH_LABEL = "> CloverWisp Theta high";
 const ROXY_NUMERIC_OUTPUT_MAX = 30;
-const ROXY_SPEED_GUARD_MAX_DEPTH = 8;
+const ROXY_OD_NEUTRAL = 9;
+const ROXY_CANONICAL_FIRST_OBJECT_MS = 1000;
 
 function buildErrorResult(code, message, extras = {}) {
     return {
@@ -117,12 +118,6 @@ function safeDiv(a, b, fallback = 0) {
 
 function fmt4(value) {
     return Number.isFinite(value) ? Number(value.toFixed(4)) : null;
-}
-
-function fmtDebugValue(value) {
-    if (typeof value === "boolean" || value == null) return value;
-    if (typeof value === "string") return value;
-    return fmt4(value);
 }
 
 function numericToRoxyRcLabel(numeric) {
@@ -168,7 +163,7 @@ function resolveRoxyOd(baseOd, odFlag) {
 function computeOdDetails(baseOd, odFlag) {
     const base = Number.isFinite(Number(baseOd)) ? Number(baseOd) : 8;
     const effective = resolveRoxyOd(base, odFlag);
-    const baseWindow = sunnyJudgementWindowFromOd(base);
+    const baseWindow = sunnyJudgementWindowFromOd(ROXY_OD_NEUTRAL);
     const effectiveWindow = sunnyJudgementWindowFromOd(effective);
     const pressureRatio = baseWindow != null && effectiveWindow != null && effectiveWindow > 1e-9
         ? clamp(baseWindow / effectiveWindow, 0.55, 1.85)
@@ -176,6 +171,7 @@ function computeOdDetails(baseOd, odFlag) {
 
     return {
         base,
+        neutral: ROXY_OD_NEUTRAL,
         effective,
         flag: odFlag == null ? null : String(odFlag),
         baseWindow,
@@ -189,8 +185,9 @@ function computeOdCorrection(odDetails, numeric) {
     if (!Number.isFinite(ratio) || Math.abs(ratio - 1) < 1e-6) return 0;
 
     const difficultyGate = gate(Number(numeric), 6, 18);
-    const correction = Math.log(ratio) * (1.15 + (0.70 * difficultyGate));
-    return clamp(correction, -0.75, 0.75);
+    const highDifficultyGate = gate(Number(numeric), 14, 18.4);
+    const correction = Math.log(ratio) * (3.20 + (1.90 * difficultyGate) + (0.60 * highDifficultyGate));
+    return clamp(correction, -2.20, 2.20);
 }
 
 function gate(value, min, max) {
@@ -300,6 +297,130 @@ function applyConversionFlag(parser, cvtFlag) {
     } else if (normalized === "IN") {
         parser.modIN();
     }
+}
+
+function parseOsuCsvLine(line) {
+    const parts = [];
+    let current = "";
+    let inQuote = false;
+    for (let i = 0; i < line.length; i += 1) {
+        const ch = line[i];
+        if (ch === "\"") {
+            inQuote = !inQuote;
+            current += ch;
+        } else if (ch === "," && !inQuote) {
+            parts.push(current);
+            current = "";
+        } else {
+            current += ch;
+        }
+    }
+    parts.push(current);
+    return parts;
+}
+
+function detectFirstHitObjectTime(osuText) {
+    const lines = String(osuText || "").split(/\r?\n/);
+    let section = "";
+    let first = Number.POSITIVE_INFINITY;
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("//")) continue;
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            section = trimmed;
+            continue;
+        }
+        if (section !== "[HitObjects]") continue;
+
+        const parts = parseOsuCsvLine(line);
+        const time = Number(parts[2]);
+        if (Number.isFinite(time)) {
+            first = Math.min(first, time);
+        }
+    }
+
+    return Number.isFinite(first) ? first : null;
+}
+
+function canonicalizeOsuTiming(osuText, speedRate) {
+    const rate = Number(speedRate);
+    const firstTime = detectFirstHitObjectTime(osuText);
+    if (!Number.isFinite(rate) || rate <= 0 || firstTime == null) {
+        return {
+            text: osuText,
+            speedRate: rate,
+            firstTime,
+            applied: false,
+        };
+    }
+
+    const firstScaled = firstTime / rate;
+    const scaleTime = (raw) => {
+        const numeric = Number(raw);
+        if (!Number.isFinite(numeric)) return raw;
+        const scaled = (numeric / rate) - firstScaled + ROXY_CANONICAL_FIRST_OBJECT_MS;
+        return String(Math.floor(scaled));
+    };
+    const scaleBeatLength = (raw) => {
+        const numeric = Number(raw);
+        if (!Number.isFinite(numeric) || numeric <= 0) return raw;
+        return String(Number((numeric / rate).toFixed(12)));
+    };
+
+    let section = "";
+    const lines = String(osuText).split(/\r?\n/);
+    const out = lines.map((line) => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            section = trimmed;
+            return line;
+        }
+        if (!trimmed || trimmed.startsWith("//")) return line;
+
+        if (section === "[TimingPoints]") {
+            const parts = parseOsuCsvLine(line);
+            if (parts.length > 0) {
+                parts[0] = scaleTime(parts[0]);
+                if (parts.length > 1) {
+                    parts[1] = scaleBeatLength(parts[1]);
+                }
+                return parts.join(",");
+            }
+        }
+
+        if (section === "[Events]") {
+            const parts = parseOsuCsvLine(line);
+            if (String(parts[0] || "").trim() === "2" && parts.length >= 3) {
+                parts[1] = scaleTime(parts[1]);
+                parts[2] = scaleTime(parts[2]);
+                return parts.join(",");
+            }
+        }
+
+        if (section === "[HitObjects]") {
+            const parts = parseOsuCsvLine(line);
+            if (parts.length >= 5) {
+                parts[2] = scaleTime(parts[2]);
+                const type = Number(parts[3]) || 0;
+                if ((type & 128) !== 0 && parts[5]) {
+                    const objectParams = String(parts[5]).split(":");
+                    objectParams[0] = scaleTime(objectParams[0]);
+                    parts[5] = objectParams.join(":");
+                }
+                return parts.join(",");
+            }
+        }
+
+        return line;
+    });
+
+    return {
+        text: out.join("\n"),
+        speedRate: 1,
+        firstTime,
+        applied: true,
+    };
 }
 
 function buildTapRows(parsed, speedRate, toleranceMs) {
@@ -512,7 +633,8 @@ function computeRoxyCurve(rows, taps, activity) {
     let overlapSum = 0;
     let rotationSum = 0;
     let eligibleHandEvents = 0;
-    let anchorRows = 0;
+    let anchorRowStrengthSum = 0;
+    let fastJackStrengthSum = 0;
 
     for (let i = 0; i < rows.length; i += 1) {
         const row = rows[i];
@@ -554,11 +676,12 @@ function computeRoxyCurve(rows, taps, activity) {
             if (Number.isFinite(lastColumnTime[c])) {
                 dtSame[c] = Math.max(1, row.t - lastColumnTime[c]);
                 dtSameValues.push(dtSame[c]);
-                if (dtSame[c] <= 220) anchorRow = 1;
+                anchorRow = Math.max(anchorRow, inverseGate(dtSame[c], 220, 260));
+                fastJackStrengthSum += inverseGate(dtSame[c], 120, 150);
                 jackMax = Math.max(jackMax, strainRate(dtSame[c], 185, 35, 1.18));
             }
         }
-        if (anchorRow) anchorRows += 1;
+        anchorRowStrengthSum += anchorRow;
 
         leftLoad += row.leftCount;
         rightLoad += row.rightCount;
@@ -702,7 +825,6 @@ function computeRoxyCurve(rows, taps, activity) {
     const q75Local = quantile(localRaw, 0.75);
     const peakToSustainGap = clamp(safeDiv(q97Local - q75Local, Math.max(q97Local, 1e-6), 0), 0, 1);
     const finiteSameCount = dtSameValues.length;
-    const fastSameCount = dtSameValues.filter((value) => value <= 120).length;
     const maxColumnCount = Math.max(...columnCounts);
     const minColumnCount = Math.min(...columnCounts);
 
@@ -713,8 +835,8 @@ function computeRoxyCurve(rows, taps, activity) {
         overlapRate: overlapSum / Math.max(rows.length, 1),
         rotationRate: rotationSum / Math.max(eligibleHandEvents, 1),
         sameHandQ10: quantile(dtHandValues, 0.10),
-        fastJackRate: fastSameCount / Math.max(finiteSameCount, 1),
-        anchorRate: anchorRows / Math.max(rows.length, 1),
+        fastJackRate: fastJackStrengthSum / Math.max(finiteSameCount, 1),
+        anchorRate: anchorRowStrengthSum / Math.max(rows.length, 1),
         anchorImbalance: (maxColumnCount - minColumnCount) / Math.max(taps.length, 1),
         leftLoad,
         rightLoad,
@@ -823,6 +945,8 @@ function computeRoxyNumeric(curve) {
 }
 
 const ROXY_META_ALGOS = Object.freeze(["Azusa", "Sunny", "Daniel", "Roxy"]);
+const ROXY_REFERENCE_BUCKET_SIZE = 1.0;
+const ROXY_DISABLED_META_REFERENCES = Object.freeze(new Set(["Sunny"]));
 
 function toFeatureNumber(value) {
     const numeric = Number(value);
@@ -832,6 +956,13 @@ function toFeatureNumber(value) {
 function roundedFeature(value) {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? Number(numeric.toFixed(4)) : 0;
+}
+
+function quantizeFeature(value, step) {
+    const numeric = Number(value);
+    const size = Number(step);
+    if (!Number.isFinite(numeric) || !Number.isFinite(size) || size <= 0) return 0;
+    return Number((Math.round(numeric / size) * size).toFixed(4));
 }
 
 function resultNumeric(result) {
@@ -860,6 +991,41 @@ function safeReference(run) {
     }
 }
 
+function stabilizeHighReferencePredictions(predictions, structuralNumeric) {
+    const azusa = Number(predictions?.Azusa);
+    if (!Number.isFinite(azusa) || azusa < 16.8) return predictions;
+
+    const roxy = Number(predictions?.Roxy);
+    const structural = Number(structuralNumeric);
+    const finiteHighReferences = ["Azusa", "Sunny", "Daniel"]
+        .map((algo) => predictions?.[algo])
+        .filter((value) => value != null && Number.isFinite(Number(value)))
+        .map((value) => Number(value))
+        .sort((a, b) => a - b);
+    const referenceMedian = finiteHighReferences.length > 0
+        ? finiteHighReferences[Math.floor(finiteHighReferences.length / 2)]
+        : azusa;
+    const support = Math.max(
+        Number.isFinite(roxy) ? roxy : Number.NEGATIVE_INFINITY,
+        Number.isFinite(structural) ? structural : Number.NEGATIVE_INFINITY,
+    );
+    const fallback = Math.max(
+        Number.isFinite(support) ? support : azusa - 0.35,
+        azusa - 0.35,
+        referenceMedian - 0.10,
+    );
+    const stabilized = { ...predictions };
+
+    for (const algo of ["Sunny", "Daniel"]) {
+        const value = stabilized[algo];
+        if (value == null || !Number.isFinite(Number(value))) {
+            stabilized[algo] = fallback;
+        }
+    }
+
+    return stabilized;
+}
+
 function buildReferencePredictions(osuText, options, structuralNumeric) {
     const wantsGraph = options?.withGraph === true;
     const referenceOptions = {
@@ -882,13 +1048,18 @@ function buildReferencePredictions(osuText, options, structuralNumeric) {
         precomputedSunnyResult: sunnyResult,
         precomputedDanielResult: danielResult,
     }));
+    const predictions = stabilizeHighReferencePredictions({
+        Azusa: resultNumeric(azusaResult),
+        Sunny: resultNumeric(sunnyResult),
+        Daniel: resultNumeric(danielResult),
+        Roxy: Number.isFinite(structuralNumeric) ? structuralNumeric : null,
+    }, structuralNumeric);
+    for (const algo of ROXY_DISABLED_META_REFERENCES) {
+        predictions[algo] = null;
+    }
+
     return {
-        predictions: {
-            Azusa: resultNumeric(azusaResult),
-            Sunny: resultNumeric(sunnyResult),
-            Daniel: resultNumeric(danielResult),
-            Roxy: Number.isFinite(structuralNumeric) ? structuralNumeric : null,
-        },
+        predictions,
         graph: wantsGraph ? (azusaResult?.graph || null) : null,
     };
 }
@@ -900,13 +1071,32 @@ function addMetaFeature(map, name, value) {
 function buildRoxyMetaFeatures(referencePredictions, numericDetails, curve, structuralNumeric) {
     const map = Object.create(null);
     const finitePredictions = [];
+    const normalizedPredictions = Object.create(null);
+    const fallbackCandidates = [];
+
+    for (const algo of ROXY_META_ALGOS) {
+        const rawValue = referencePredictions[algo];
+        const value = Number(rawValue);
+        if (rawValue != null && Number.isFinite(value)) {
+            fallbackCandidates.push(quantizeFeature(value, ROXY_REFERENCE_BUCKET_SIZE));
+        }
+    }
+    if (fallbackCandidates.length === 0 && Number.isFinite(structuralNumeric)) {
+        fallbackCandidates.push(quantizeFeature(structuralNumeric, ROXY_REFERENCE_BUCKET_SIZE));
+    }
+    fallbackCandidates.sort((a, b) => a - b);
+    const fallbackPrediction = fallbackCandidates.length === 0
+        ? 0
+        : fallbackCandidates[Math.floor(fallbackCandidates.length / 2)];
 
     for (const algo of ROXY_META_ALGOS) {
         const value = referencePredictions[algo];
         const hasValue = Number.isFinite(value);
-        addMetaFeature(map, `pred_${algo}`, hasValue ? value : 0);
+        const normalizedValue = hasValue ? quantizeFeature(value, ROXY_REFERENCE_BUCKET_SIZE) : fallbackPrediction;
+        normalizedPredictions[algo] = normalizedValue;
+        addMetaFeature(map, `pred_${algo}`, normalizedValue);
         addMetaFeature(map, `has_${algo}`, hasValue ? 1 : 0);
-        if (hasValue) finitePredictions.push(value);
+        finitePredictions.push(normalizedValue);
     }
 
     if (finitePredictions.length === 0) {
@@ -932,7 +1122,7 @@ function buildRoxyMetaFeatures(referencePredictions, numericDetails, curve, stru
         ["Sunny", "Roxy"],
     ];
     for (const [left, right] of pairs) {
-        const diff = toFeatureNumber(referencePredictions[left]) - toFeatureNumber(referencePredictions[right]);
+        const diff = toFeatureNumber(normalizedPredictions[left]) - toFeatureNumber(normalizedPredictions[right]);
         addMetaFeature(map, `diff_${left}_${right}`, diff);
         addMetaFeature(map, `absdiff_${left}_${right}`, Math.abs(diff));
     }
@@ -1019,208 +1209,96 @@ function computeRoxyMetaNumeric(osuText, options, numericDetails, curve, structu
     };
 }
 
-function maxFinite(values) {
-    let best = Number.NEGATIVE_INFINITY;
-    for (const value of values) {
-        const numeric = Number(value);
-        if (Number.isFinite(numeric)) {
-            best = Math.max(best, numeric);
-        }
-    }
-    return best === Number.NEGATIVE_INFINITY ? null : best;
-}
+function buildRoxyGraphFromAzusa(osuText, options) {
+    if (options?.withGraph !== true) return null;
 
-function computeExtremeStructuralFloor(speedRate, numericDetails) {
-    const logRaw = Number(numericDetails?.logRaw);
-    if (!Number.isFinite(logRaw)) return null;
-
-    const rateGain = Math.log2(Math.max(1, speedRate));
-    const overflow = Math.max(0, logRaw - ROXY_CONFIG.rawMap.p98);
-    if (overflow <= 0) return null;
-
-    const overflowGate = gate(overflow, 0.02, 0.35);
-    return clamp(18.4 + (2.35 * overflow) + (0.55 * rateGain * overflowGate), -2, ROXY_NUMERIC_OUTPUT_MAX);
-}
-
-function computeSpeedRateLift(speedRate, baselineNumeric, curve) {
-    const rateGain = Math.log2(Math.max(1, speedRate));
-    if (rateGain <= 0 || !Number.isFinite(baselineNumeric)) return 0;
-
-    const rateIntensity = rateGain + (0.35 * Math.max(0, speedRate - 1));
-    const stats = curve?.stats || {};
-    const streams = curve?.streamSummaries || {};
-    const baselineGate = gate(baselineNumeric, 8, 18.4);
-    const midBaselineGate = gate(baselineNumeric, 10.5, 13.5) * inverseGate(baselineNumeric, 14.5, 17);
-    const highBaselineGate = gate(baselineNumeric, 14, 18.4);
-    const densityGate = gate(toFeatureNumber(stats.avgNps), 18, 42);
-    const handIntervalGate = inverseGate(toFeatureNumber(stats.sameHandQ10), 35, 95);
-    const chordGate = gate(toFeatureNumber(stats.chordRate), 0.18, 0.55);
-    const speedStreamGate = gate(toFeatureNumber(streams.speed?.aggregate), 7, 22);
-    const gainPerDoubling = 0.70
-        + (1.20 * baselineGate)
-        + (2.40 * midBaselineGate)
-        + (0.75 * highBaselineGate)
-        + (0.55 * densityGate)
-        + (0.45 * handIntervalGate)
-        + (0.25 * chordGate)
-        + (0.35 * speedStreamGate);
-
-    return rateIntensity * gainPerDoubling;
-}
-
-function computeSpeedGuardAnchorRate(speedRate) {
-    const rate = Number(speedRate);
-    if (!Number.isFinite(rate) || rate <= 1.000001) return null;
-
-    if (rate <= 1.15 + 1e-9) return Math.max(1.0, Number((rate - 0.025).toFixed(6)));
-    if (rate <= 1.30 + 1e-9) return Math.max(1.0, Number((rate - 0.05).toFixed(6)));
-    if (rate <= 1.50 + 1e-9) return Math.max(1.0, Number((rate - 0.10).toFixed(6)));
-    if (rate <= 2.00 + 1e-9) return Math.max(1.0, Number((rate - 0.125).toFixed(6)));
-
-    return Math.max(1.0, Number((rate - 0.25).toFixed(6)));
-}
-
-function computeAnchorSpeedRateLift(speedRate, anchorRate, anchorNumeric, curve) {
-    const rate = Number(speedRate);
-    const anchor = Number(anchorRate);
-    const numeric = Number(anchorNumeric);
-    if (!Number.isFinite(rate) || !Number.isFinite(anchor) || !Number.isFinite(numeric) || rate <= anchor) {
-        return 0;
-    }
-
-    const deltaGain = Math.log2(rate / Math.max(anchor, 1e-6));
-    if (!Number.isFinite(deltaGain) || deltaGain <= 0) return 0;
-
-    const stats = curve?.stats || {};
-    const streams = curve?.streamSummaries || {};
-    const densityGate = gate(toFeatureNumber(stats.avgNps), 18, 42);
-    const handIntervalGate = inverseGate(toFeatureNumber(stats.sameHandQ10), 35, 95);
-    const speedStreamGate = gate(toFeatureNumber(streams.speed?.aggregate), 7, 22);
-    const highGate = gate(numeric, 10, ROXY_THETA_HIGH_NUMERIC);
-    const thetaGate = gate(numeric, 16, ROXY_THETA_HIGH_NUMERIC);
-    const minPerDoubling = 0.25
-        + (0.45 * highGate)
-        + (0.35 * thetaGate)
-        + (0.15 * densityGate)
-        + (0.12 * handIntervalGate)
-        + (0.10 * speedStreamGate);
-
-    return (deltaGain + (0.20 * Math.max(0, rate - anchor))) * minPerDoubling;
-}
-
-function buildSpeedGuardCacheKey(speedRate, options, skipGuard) {
-    const rateKey = Number(speedRate).toFixed(6);
-    const odKey = options?.odFlag == null ? "" : String(options.odFlag);
-    const cvtKey = normalizeCvtFlag(options?.cvtFlag) || "";
-    const sunnyHoKey = options?.forceSunnyReferenceHo === false ? "sunny-no-ho" : "sunny-ho";
-    return `${rateKey}|${skipGuard ? "skip" : "guard"}|${odKey}|${cvtKey}|${sunnyHoKey}`;
-}
-
-function runSpeedGuardProbe(osuText, options, speedRate, depth, skipGuard) {
-    const cache = options?._roxySpeedGuardCache instanceof Map ? options._roxySpeedGuardCache : null;
-    const cacheKey = buildSpeedGuardCacheKey(speedRate, options, skipGuard);
-    if (cache?.has(cacheKey)) {
-        return cache.get(cacheKey);
-    }
-
-    const result = runRoxyEstimatorFromText(osuText, {
+    const referenceOptions = {
         ...options,
-        speedRate,
         withGraph: false,
-        precomputedSunnyResult: null,
-        precomputedDanielResult: null,
-        _roxySpeedGuardDepth: depth,
-        _skipRoxySpeedRateGuard: skipGuard,
-    });
-    if (cache) cache.set(cacheKey, result);
-    return result;
+    };
+    const sunnyResult = safeReference(() => runSunnyEstimatorFromText(osuText, {
+        ...referenceOptions,
+        withGraph: true,
+    }));
+    const danielResult = safeReference(() => runDanielEstimatorFromText(osuText, referenceOptions));
+    const azusaResult = safeReference(() => runAzusaEstimatorFromText(osuText, {
+        ...referenceOptions,
+        withGraph: true,
+        precomputedSunnyResult: sunnyResult,
+        precomputedDanielResult: danielResult,
+    }));
+
+    return azusaResult?.graph || null;
 }
 
-function applySpeedRateGuard(osuText, options, speedRate, unguardedNumeric, numericDetails, curve, referencePredictions) {
-    const depth = Math.max(0, Math.trunc(Number(options?._roxySpeedGuardDepth) || 0));
-    const result = {
-        applied: false,
-        speedRate,
-        depth,
-        unguardedNumeric,
-        finalFloor: null,
-        baselineNumeric: null,
-        baselineFloor: null,
-        anchorRate: null,
-        anchorNumeric: null,
-        anchorLift: null,
-        anchorFloor: null,
-        referenceFloor: null,
-        extremeStructuralFloor: null,
-    };
+function streamAggregate(streams, name) {
+    const value = streams?.[name];
+    if (typeof value === "number") return value;
+    return toFeatureNumber(value?.aggregate);
+}
 
-    if (options?._skipRoxySpeedRateGuard === true || speedRate <= 1.000001 || !Number.isFinite(unguardedNumeric)) {
-        return {
-            numeric: unguardedNumeric,
-            debug: result,
-        };
-    }
+function computeHighReferenceStructuralFloor(referencePredictions, numericDetails, curve, odCorrection) {
+    const azusa = Number(referencePredictions?.Azusa);
+    if (!Number.isFinite(azusa) || azusa < 17.0) return null;
+    const hasSunny = referencePredictions?.Sunny != null && Number.isFinite(Number(referencePredictions.Sunny));
+    const hasDaniel = referencePredictions?.Daniel != null && Number.isFinite(Number(referencePredictions.Daniel));
 
-    const rateGain = Math.log2(Math.max(1, speedRate));
-    const rateIntensity = rateGain + (0.35 * Math.max(0, speedRate - 1));
-    const finiteReferenceMax = maxFinite(Object.values(referencePredictions || {}));
-    if (finiteReferenceMax != null) {
-        result.referenceFloor = finiteReferenceMax + (0.35 * rateIntensity * gate(finiteReferenceMax, 12, 18.4));
-    }
-    result.extremeStructuralFloor = computeExtremeStructuralFloor(speedRate, numericDetails);
+    const stats = curve?.stats || {};
+    const streams = curve?.streamSummaries || {};
+    const avgNps = toFeatureNumber(stats.avgNps);
+    const chordRate = toFeatureNumber(stats.chordRate);
+    const sameHandQ10 = toFeatureNumber(stats.sameHandQ10);
+    if (avgNps < 25 || chordRate < 0.70 || sameHandQ10 > 95) return null;
 
-    try {
-        const baselineResult = runSpeedGuardProbe(osuText, options, 1.0, depth + 1, true);
-        const baselineNumeric = Number(baselineResult?.numericDifficulty);
-        if (Number.isFinite(baselineNumeric)) {
-            result.baselineNumeric = baselineNumeric;
-            result.baselineFloor = baselineNumeric + computeSpeedRateLift(speedRate, baselineNumeric, curve);
-        }
-    } catch {
-        result.baselineNumeric = null;
-        result.baselineFloor = null;
-    }
+    const densityGate = gate(avgNps, 27, 38);
+    const chordGate = gate(chordRate, 0.78, 0.92);
+    const threeGate = gate(toFeatureNumber(stats.threeRate), 0.45, 0.72);
+    const jackGate = gate(streamAggregate(streams, "jack"), 17.5, 21.8);
+    const chordjackGate = gate(streamAggregate(streams, "chordjack"), 12.4, 15.6);
+    const fastHandGate = inverseGate(sameHandQ10, 70, 110);
+    const durationGate = gate(toFeatureNumber(stats.activeDurationSec), 50, 100);
+    const rawGate = gate(toFeatureNumber(numericDetails?.rawNumeric), 6, 17);
+    const pressure = clamp(
+        (0.20 * densityGate)
+        + (0.14 * chordGate)
+        + (0.10 * threeGate)
+        + (0.20 * jackGate)
+        + (0.16 * chordjackGate)
+        + (0.14 * fastHandGate)
+        + (0.06 * durationGate),
+        0,
+        1,
+    );
 
-    if (depth < ROXY_SPEED_GUARD_MAX_DEPTH) {
-        const anchorRate = computeSpeedGuardAnchorRate(speedRate);
-        if (anchorRate != null && anchorRate < speedRate - 1e-9) {
-            result.anchorRate = anchorRate;
-            try {
-                const anchorResult = runSpeedGuardProbe(osuText, options, anchorRate, depth + 1, false);
-                const anchorNumeric = Number(anchorResult?.numericDifficulty);
-                if (Number.isFinite(anchorNumeric)) {
-                    result.anchorNumeric = anchorNumeric;
-                    result.anchorLift = computeAnchorSpeedRateLift(speedRate, anchorRate, anchorNumeric, curve);
-                    result.anchorFloor = anchorNumeric + result.anchorLift;
-                }
-            } catch {
-                result.anchorNumeric = null;
-                result.anchorLift = null;
-                result.anchorFloor = null;
-            }
-        }
-    }
+    const pressureGate = gate(pressure, 0.22, 0.46);
+    const azusaGate = gate(azusa, 17.0, 18.0);
+    const missingReferenceRatio = ((!hasSunny ? 1 : 0) + (!hasDaniel ? 1 : 0)) / 2;
+    const missingReferenceBoost = missingReferenceRatio
+        * gate(pressure, 0.25, 0.40)
+        * gate(azusa, 17.5, 18.2);
+    const activation = clamp((pressureGate * azusaGate) + missingReferenceBoost, 0, 1);
+    if (activation <= 0) return null;
 
-    const floor = maxFinite([
-        result.baselineFloor,
-        result.anchorFloor,
-        result.referenceFloor,
-        result.extremeStructuralFloor,
-    ]);
-    result.finalFloor = floor;
+    const confidence = pressureGate * gate(azusa, 17.0, 20.0);
+    const referenceFloor = azusa - (0.45 - (0.25 * confidence));
+    const structuralFloor = 16.65
+        + (1.55 * confidence)
+        + (0.35 * rawGate)
+        + (0.25 * gate(avgNps, 35, 45));
+    const odAdjustment = Math.min(0, Number(odCorrection) || 0) * 0.25;
+    const structuralTarget = structuralFloor + odAdjustment;
+    const referenceTarget = Math.max(referenceFloor, structuralFloor) + odAdjustment;
+    const floor = structuralTarget + ((referenceTarget - structuralTarget) * activation);
 
-    if (floor == null) {
-        return {
-            numeric: unguardedNumeric,
-            debug: result,
-        };
-    }
-
-    const guardedNumeric = clamp(Math.max(unguardedNumeric, floor), -2, ROXY_NUMERIC_OUTPUT_MAX);
-    result.applied = guardedNumeric > unguardedNumeric + 1e-9;
     return {
-        numeric: guardedNumeric,
-        debug: result,
+        floor: clamp(floor, 16.8, Math.min(18.65, azusa + 0.30)),
+        activation,
+        missingReferenceBoost,
+        pressure,
+        confidence,
+        referenceFloor,
+        structuralFloor,
+        referenceTarget,
     };
 }
 
@@ -1236,16 +1314,16 @@ export function runRoxyEstimatorFromText(osuText, options = {}) {
         }
 
         const odFlag = normalizeRoxyOdFlag(options);
-        const speedGuardCache = options?._roxySpeedGuardCache instanceof Map
-            ? options._roxySpeedGuardCache
-            : new Map();
+        const timing = canonicalizeOsuTiming(osuText, speedRate);
+        const analysisText = timing.text;
+        const analysisSpeedRate = timing.speedRate;
         const effectiveOptions = {
             ...options,
             odFlag,
-            _roxySpeedGuardCache: speedGuardCache,
+            speedRate: analysisSpeedRate,
         };
 
-        const parser = new OsuFileParser(osuText);
+        const parser = new OsuFileParser(analysisText);
         parser.process();
         applyConversionFlag(parser, effectiveOptions.cvtFlag);
         const parsed = parser.getParsedData();
@@ -1271,7 +1349,7 @@ export function runRoxyEstimatorFromText(osuText, options = {}) {
             );
         }
 
-        const { taps, rows } = buildTapRows(parsed, speedRate, ROXY_CONFIG.rowToleranceMs);
+        const { taps, rows } = buildTapRows(parsed, analysisSpeedRate, ROXY_CONFIG.rowToleranceMs);
         if (taps.length < ROXY_CONFIG.minNotes || rows.length < 2) {
             return buildErrorResult("TooFewNotes", "Not enough RC tap notes", { lnRatio, columnCount });
         }
@@ -1282,28 +1360,41 @@ export function runRoxyEstimatorFromText(osuText, options = {}) {
         const curve = computeRoxyCurve(rows, taps, activity);
         const numericDetails = computeRoxyNumeric(curve);
         const structuralNumeric = Number(numericDetails.numeric.toFixed(2));
-        const metaOptions = odFlag == null
-            ? effectiveOptions
-            : {
-                ...effectiveOptions,
-                odFlag: null,
-                precomputedSunnyResult: null,
-            };
-        const metaDetails = computeRoxyMetaNumeric(osuText, metaOptions, numericDetails, curve, structuralNumeric);
+        const metaOptions = {
+            ...effectiveOptions,
+            odFlag: ROXY_OD_NEUTRAL,
+            precomputedSunnyResult: null,
+        };
+        const metaDetails = computeRoxyMetaNumeric(analysisText, metaOptions, numericDetails, curve, structuralNumeric);
         const metaNumeric = Number(metaDetails.metaNumeric);
-        const baseUnguardedNumeric = Number.isFinite(metaNumeric) ? metaNumeric : structuralNumeric;
+        let baseUnguardedNumeric = Number.isFinite(metaNumeric) ? metaNumeric : structuralNumeric;
+        const structuralBackstopStrength = Number.isFinite(structuralNumeric)
+            ? gate(structuralNumeric, 12.25, 14.0)
+            : 0;
+        const structuralBackstop = structuralBackstopStrength > 0
+            ? structuralNumeric - 0.15
+            : null;
+        const structuralBackstopGap = structuralBackstop != null
+            ? structuralBackstop - baseUnguardedNumeric
+            : 0;
+        const structuralBackstopApplied = structuralBackstop != null
+            && structuralBackstopGap > 0
+            && structuralBackstopGap <= 0.35;
+        if (structuralBackstopApplied) {
+            baseUnguardedNumeric += (structuralBackstop - baseUnguardedNumeric) * structuralBackstopStrength;
+        }
         const odCorrection = computeOdCorrection(odDetails, baseUnguardedNumeric);
-        const unguardedNumeric = clamp(baseUnguardedNumeric + odCorrection, -2, ROXY_NUMERIC_OUTPUT_MAX);
-        const guarded = applySpeedRateGuard(
-            osuText,
-            effectiveOptions,
-            speedRate,
-            unguardedNumeric,
+        let unguardedNumeric = clamp(baseUnguardedNumeric + odCorrection, -2, ROXY_NUMERIC_OUTPUT_MAX);
+        const highReferenceFloor = computeHighReferenceStructuralFloor(
+            metaDetails.referencePredictions,
             numericDetails,
             curve,
-            metaDetails.referencePredictions,
+            odCorrection,
         );
-        const finalNumeric = Number(guarded.numeric.toFixed(2));
+        if (highReferenceFloor != null) {
+            unguardedNumeric = Math.max(unguardedNumeric, highReferenceFloor.floor);
+        }
+        const finalNumeric = Number(unguardedNumeric.toFixed(2));
         const estDiff = numericToRoxyRcLabel(finalNumeric);
 
         return {
@@ -1312,7 +1403,7 @@ export function runRoxyEstimatorFromText(osuText, options = {}) {
             columnCount,
             estDiff,
             numericDifficulty: finalNumeric,
-            numericDifficultyHint: "roxy-meta-gbdt-v2",
+            numericDifficultyHint: "roxy-meta-ridge-v3",
             graph: options.withGraph === true ? (metaDetails.graph || null) : null,
             rawNumericDifficulty: Number(numericDetails.rawNumeric.toFixed(4)),
             debug: {
@@ -1325,18 +1416,34 @@ export function runRoxyEstimatorFromText(osuText, options = {}) {
                 structuralNumeric: fmt4(structuralNumeric),
                 metaNumeric: fmt4(metaNumeric),
                 baseUnguardedNumeric: fmt4(baseUnguardedNumeric),
+                structuralBackstop: {
+                    applied: structuralBackstopApplied,
+                    floor: fmt4(structuralBackstop),
+                    strength: fmt4(structuralBackstopStrength),
+                },
                 unguardedNumeric: fmt4(unguardedNumeric),
                 finalNumeric: fmt4(finalNumeric),
+                highReferenceStructuralFloor: highReferenceFloor == null ? null : Object.fromEntries(
+                    Object.entries(highReferenceFloor).map(([key, value]) => [key, fmt4(value)]),
+                ),
                 od: {
                     flag: odDetails.flag,
                     base: fmt4(odDetails.base),
+                    neutral: fmt4(odDetails.neutral),
                     effective: fmt4(odDetails.effective),
                     baseWindow: fmt4(odDetails.baseWindow),
                     effectiveWindow: fmt4(odDetails.effectiveWindow),
                     pressureRatio: fmt4(odDetails.pressureRatio),
                     correction: fmt4(odCorrection),
                 },
-                speedRateGuard: Object.fromEntries(Object.entries(guarded.debug).map(([key, value]) => [key, fmtDebugValue(value)])),
+                speedRateMode: {
+                    mode: "time-scale-only",
+                    speedRate: fmt4(speedRate),
+                    analysisSpeedRate: fmt4(analysisSpeedRate),
+                    canonicalFirstObjectMs: ROXY_CANONICAL_FIRST_OBJECT_MS,
+                    originalFirstObjectMs: fmt4(timing.firstTime),
+                    canonicalized: timing.applied,
+                },
                 meta: {
                     featureCount: ROXY_META_FEATURE_NAMES.length,
                     references: Object.fromEntries(Object.entries(metaDetails.referencePredictions).map(([key, value]) => [key, fmt4(value)])),

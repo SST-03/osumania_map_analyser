@@ -72,7 +72,7 @@ import {
     setEffectiveContentBarForMap,
 } from "./settings.js";
 import { scheduleRecompute } from "./scheduler.js";
-import { detectVibro, detectVibroFromLongjackPattern } from "./vibro.js";
+import { detectVibro } from "./vibro.js";
 
 function parseMetadataFromBeatmap(osuText) {
     const parser = new OsuFileParser(osuText);
@@ -528,10 +528,7 @@ export async function fetchBeatmapFile(reason) {
                 const vibroEligible = Number.isFinite(reworkStarValue) && reworkStarValue > 5.0;
                 isVibroMap = state.vibroDetection
                     && vibroEligible
-                    && (
-                        detectVibro(ettResult?.values, VIBRO_JACKSPEED_RATIO_THRESHOLD)
-                        || detectVibroFromLongjackPattern(patternReport, PATTERNS_CONFIG.LONGJACK_VIBRO_RATIO_THRESHOLD, PATTERNS_CONFIG.LONGJACK_VIBRO_MIN_BPM)
-                    );
+                    && detectVibro(ettResult?.values, VIBRO_JACKSPEED_RATIO_THRESHOLD);
 
                 if (showsEtterna) {
                     if (!(await waitForBodyRenderReady())) return;

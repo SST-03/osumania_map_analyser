@@ -1,6 +1,6 @@
 # Roxy 4K RC Difficulty Estimator
 
-Roxy is a synchronous 4-key regular-chain difficulty estimator for osu!mania. It combines a structural strain model with a compact meta calibration head. The structural layer reads the chart directly; the reference layer uses Sunny, Daniel, and a Roxy-private Azusa call as additional numeric signals. Roxy does not call Mixed or Companella.
+Roxy is a synchronous 4-key regular-chain difficulty estimator for osu!mania. It combines a structural strain model with a compact meta calibration head. The structural layer reads the chart directly; the reference layer uses Azusa and Daniel as numeric signals. Sunny is computed only for Azusa reuse and graph support, and is disabled as an independent meta input. Roxy does not call Mixed or Companella, and Azusa remains available as an independent selectable estimator.
 
 ## 1. Scope
 
@@ -20,15 +20,16 @@ Invalid results use the same estimator result shape as valid results, but return
 
 ```text
 Parse .osu text
+  -> canonicalize the time axis for speedRate
   -> build 4K tap rows
   -> compute row, hand, column, rhythm, entropy, and NPS features
   -> update seven structural strain streams
   -> aggregate streams into structural numeric difficulty
   -> compute Sunny and Daniel once
-  -> call private Azusa with those precomputed references
-  -> build meta features from Azusa/Sunny/Daniel/Roxy
-  -> evaluate GBDT calibration head
-  -> apply high-speed monotonic guard
+  -> call Azusa with those precomputed references
+  -> build meta features from Azusa/Daniel/Roxy; keep Sunny slot disabled
+  -> evaluate ridge linear calibration head
+  -> apply OD and high-reference structural floor
   -> format RC label and optional Azusa graph
 ```
 
@@ -38,7 +39,7 @@ The reference order is deliberately fixed:
 2. Reuse `precomputedDanielResult` when available; otherwise compute Daniel once.
 3. Call Azusa with both precomputed results.
 
-This keeps Roxy, Azusa, Daniel, and Sunny aligned without recomputing Daniel or Sunny inside Azusa.
+This keeps Roxy, Azusa, Daniel, and Sunny aligned without recomputing Daniel or Sunny inside Azusa. Sunny is not treated as a separate voting signal in the meta head.
 
 ## 3. Basic Functions
 
@@ -59,12 +60,33 @@ decay(state, input, dt, tau)
 
 `g` is a rising gate, `gi` is a falling gate, and `r` maps shorter intervals to larger strain with a hard cap.
 
-## 4. Row Model
+## 4. Speed-Rate Canonicalization
 
-Each tap note is scaled by speed rate:
+`speedRate` is treated as a pure time-axis transform. Roxy does not apply a post-score rate bonus, monotonic projection, or rate-specific special case. Instead it rewrites the timing-dependent parts of the `.osu` text and then analyzes the result at `analysisSpeedRate = 1`.
+
+Let `firstObjectTime` be the first hitobject start time and `canonicalFirstObjectMs = 1000`:
 
 ```text
-t = startTime / speedRate
+canonicalTime(t) =
+  floor(t / speedRate - firstObjectTime / speedRate + canonicalFirstObjectMs)
+```
+
+The transform is applied to:
+
+- timing point timestamps
+- positive timing point beat lengths
+- break event start/end timestamps
+- hitobject start times
+- LN end times
+
+After this step, using `speedRate = 1.3` on an original chart is intended to follow the same analysis path as an equivalent pre-speeded `1.3x` `.osu` file. Roxy uses `floor` for timestamp conversion because the benchmark pre-speeded `.osu` files follow floor-style integer conversion.
+
+## 5. Row Model
+
+Rows are built from the canonicalized text. In the normal analysis path this means:
+
+```text
+t = canonicalizedStartTime
 ```
 
 Notes within `2 ms` are merged into one row. Each row stores:
@@ -102,7 +124,7 @@ Two entropy windows are maintained over `750 ms`:
 - `entropy750`: frequency entropy of the 16 possible row masks
 - `transitionEntropy750`: frequency entropy of 256 possible `prevMask -> mask` transitions
 
-## 5. Structural Inputs
+## 6. Structural Inputs
 
 Roxy converts every row into seven input signals.
 
@@ -179,7 +201,7 @@ staminaIn =
 + 0.25 * max(handStamina[0], handStamina[1])
 ```
 
-## 6. Strain Streams
+## 7. Strain Streams
 
 Each structural input updates a burst and sustain state. The stream output is a weighted mix of those states.
 
@@ -206,7 +228,7 @@ localRaw =
 + 0.05 * course
 ```
 
-## 7. Aggregation
+## 8. Aggregation
 
 For each stream:
 
@@ -236,7 +258,7 @@ preNumeric = linearMap(logRaw, p02, p98, -2, 20)
 
 The pre-numeric value is corrected structurally, passed through an isotonic mapping, then clamped to the RC numeric range.
 
-## 8. Global Statistics
+## 9. Global Statistics
 
 Roxy measures chart-wide shape to adjust local strain:
 
@@ -250,7 +272,7 @@ handBias = abs(leftLoad - rightLoad) / max(leftLoad, rightLoad, 1e-6)
 
 Other statistics include chord rate, triple rate, same-hand overlap rate, rotation rate, same-hand interval Q10, fast jack rate, anchor rate, anchor imbalance, and peak-to-sustain gap.
 
-## 9. Structural Corrections
+## 10. Structural Corrections
 
 The correction layer handles pattern families that are not well represented by a single strain sum:
 
@@ -265,14 +287,14 @@ The correction layer handles pattern families that are not well represented by a
 
 The total correction is clamped before the isotonic mapping.
 
-## 10. Meta Calibration
+## 11. Meta Calibration
 
 The meta layer receives four numeric sources:
 
 | Source | Meaning |
 |---|---|
-| Azusa | Private Azusa result using Roxy's precomputed Sunny and Daniel references |
-| Sunny | General estimator reference, computed once or supplied by caller |
+| Azusa | Azusa result using Roxy's precomputed Sunny and Daniel references |
+| Sunny | Computed or supplied for Azusa reuse and graph support; disabled as an independent meta reference |
 | Daniel | 4K RC reference, computed once or supplied by caller |
 | Roxy | Roxy structural numeric before meta calibration |
 
@@ -286,9 +308,15 @@ Feature groups:
 - stream summaries
 - global statistics and small interaction features
 
-Unavailable references are encoded as `has = 0` and `pred = 0`. The GBDT head returns the final calibrated numeric value.
+Available reference numeric values are bucketed to `1.0` difficulty before they enter `pred_*`, aggregate prediction features, and pairwise difference features. Missing references are filled with the median of the available bucketed predictions, while the matching `has_*` feature remains `0`. This prevents reference availability changes, such as Daniel becoming valid at one adjacent rate, from injecting a `0 -> 11` discontinuity into pairwise features, and it keeps `speedRate` calls stable against the `+-1 ms` timestamp conversion commonly introduced by pre-speeded `.osu` files.
 
-## 11. OD Override
+The generated meta head is a standardized ridge linear model. It is intentionally less sharp than the earlier tree model because split thresholds were too sensitive to tiny timestamp and reference changes. This is a deliberate tradeoff: the current model gives up a large amount of in-benchmark fit in exchange for stable `speedRate` equivalence, OD-neutral references, and less benchmark-distribution memorization.
+
+The Sunny feature slots remain in the schema for compatibility with the generated feature list, but the live Sunny prediction is set unavailable before feature construction. Those slots therefore carry fallback values plus `has_Sunny = 0`, not a live Sunny vote.
+
+After meta evaluation, a structural backstop prevents the calibrated value from falling far below Roxy's own structural score. The backstop is gated from structural numeric `10.5` to `12.5` and targets `structuralNumeric - 0.15`, so it does not expose the steep low-difficulty part of the structural isotonic mapping.
+
+## 12. OD Override
 
 Roxy accepts `odFlag`, `OD`, `od`, or `overallDifficulty` in the options object. Supported values are:
 
@@ -308,65 +336,38 @@ rawWindow = 0.3 * sqrt((64.5 - ceil(od * 3)) / 500)
 judgeWindow(od) = min(rawWindow, 0.6 * (rawWindow - 0.09) + 0.09)
 
 pressureRatio = clamp(baseWindow / effectiveWindow, 0.55, 1.85)
-odCorrection = clamp(log(pressureRatio) * (1.15 + 0.70 * gate(numeric, 6, 18)), -0.75, 0.75)
-```
-
-OD is applied after the meta model and before the high-speed guard. The meta reference layer is kept OD-neutral because the GBDT was trained without OD-varied samples; feeding OD-shifted Sunny/Azusa predictions into that model can create unstable reversals.
-
-## 12. High-Speed Guard
-
-For `speedRate > 1`, Roxy applies an additional lower-bound guard. The guard compares the meta value against:
-
-- the unsped baseline estimate
-- a baseline-relative speed-rate lift
-- a recursive lower-rate anchor floor
-- a current-rate reference floor
-- an extreme structural floor derived from `logRaw` only when the current structure exceeds the calibrated raw range
-
-The speed lift uses both logarithmic and linear rate terms:
-
-```text
-rateIntensity = log2(speedRate) + 0.35 * max(0, speedRate - 1)
-baselineFloor = baseline + rateIntensity * gainPerDoubling
-```
-
-`gainPerDoubling` depends on baseline difficulty, current sped density, hand interval pressure, chord rate, and speed stream aggregate. A mid-difficulty band-pass term strengthens the `10.5..17` range so high multipliers do not collapse after the meta model leaves its training distribution.
-
-The recursive anchor floor evaluates a lower speed rate with its own guard enabled, then adds a small positive local lift:
-
-```text
-anchorRate =
-  speedRate - 0.025  for speedRate <= 1.15
-  speedRate - 0.05   for speedRate <= 1.30
-  speedRate - 0.10   for speedRate <= 1.50
-  speedRate - 0.125  for speedRate <= 2.00
-  speedRate - 0.25   otherwise
-
-anchorFloor = Roxy(osuText, speedRate=anchorRate).numericDifficulty
-            + localAnchorLift(speedRate / anchorRate)
-```
-
-The guard uses an internal recursion depth cap and a per-call cache so repeated baseline/anchor probes do not recompute the same rate inside one top-level estimate.
-
-The extreme structural floor no longer activates merely because `speedRate > 1`; it only activates when:
-
-```text
-logRaw > rawMap.p98
-```
-
-The final guarded value is:
-
-```text
-final = clamp(
-  max(unguardedNumeric, baselineFloor, anchorFloor, referenceFloor, extremeStructuralFloor),
-  -2,
-  30
+odCorrection = clamp(
+  log(pressureRatio)
+* (3.20 + 1.90 * gate(numeric, 6, 18) + 0.60 * gate(numeric, 14, 18.4)),
+  -2.20,
+  2.20
 )
 ```
 
-The structural layer and meta feature values still stay in the original calibrated range. The wider final clamp only prevents high-rate estimates from being flattened at `20.00`.
+OD is applied after the meta model and before final output. The correction uses OD9 as the neutral judgement-window baseline, so two maps with the same arrangement and different base OD keep the same neutral reference estimate before the OD pressure term is added. The meta reference layer is also kept OD-neutral because the training data does not contain reliable OD-varied samples; feeding OD-shifted reference predictions into that model can create unstable reversals.
 
-## 13. Label Soft Cap
+## 13. High-Reference Structural Floor
+
+The meta calibration layer can under-read high-density RC charts when only Azusa is available as a high reference and Daniel is invalid or weak. Roxy applies a gated floor after OD correction when all of these are true:
+
+- neutral Azusa reference is at least `17.0`, with confidence gradually increasing until `20.0`
+- `avgNps >= 25`
+- `chordRate >= 0.70`
+- `sameHandQ10 <= 95`
+- combined density/chord/three-note/jack/chordjack/fast-hand/duration pressure is at least `0.30`
+
+The floor is the maximum of an Azusa-relative floor and a structural pressure floor, with only a small negative OD damp:
+
+```text
+confidence = pressureGate * gate(Azusa, 17.0, 20.0)
+referenceFloor = Azusa - (0.45 - 0.25 * confidence)
+structuralFloor = 16.65 + 1.55 * confidence + 0.35 * rawGate + 0.25 * highNpsGate
+floor = max(referenceFloor, structuralFloor) + min(0, odCorrection) * 0.25
+```
+
+This is a targeted structural-reference guard for dense RC outliers, not a general replacement for the meta model.
+
+## 14. Label Soft Cap
 
 Roxy keeps numeric difficulty internally, but its RC label display is capped above `CloverWisp Theta high`:
 
@@ -379,11 +380,11 @@ else:
 
 This prevents Roxy from displaying `Iota` or higher labels while still allowing the numeric value and star value to reflect values above Theta high.
 
-## 14. Graph Output
+## 15. Graph Output
 
-The numeric calculation uses Roxy's structural strain data. The returned `graph` field does not use Roxy's local strain series. When graph output is requested, Roxy returns the graph provided by its private Azusa call, which currently resolves to Azusa/Sunny graph data.
+The numeric calculation uses Roxy's structural strain data. The returned `graph` field does not use Roxy's local strain series. When graph output is requested, Roxy returns the graph provided by the Azusa reference call, which currently resolves to Azusa/Sunny graph data.
 
-## 15. Complexity
+## 16. Complexity
 
 Let `N` be the number of tap notes and `R` the number of merged rows.
 
@@ -391,7 +392,7 @@ Let `N` be the number of tap notes and `R` the number of merged rows.
 - rolling NPS windows: `O(R)` with two pointers
 - entropy windows: `O(R)` with bounded mask tables
 - strain update and aggregation: `O(R)`
-- meta feature build and GBDT evaluation: bounded by model size
+- meta feature build and ridge evaluation: bounded by fixed feature count
 - memory: `O(R)` for rows and strain arrays, plus reference estimator memory
 
-Roxy is heavier than a single estimator because it uses Sunny, Daniel, and private Azusa references, but Sunny and Daniel are each computed at most once in the normal Roxy path. High-rate calls add recursive baseline/anchor probes; those probes use a small cache and disable graph output.
+Roxy is heavier than a single estimator because it uses Sunny, Daniel, and Azusa references, but Sunny and Daniel are each computed at most once in the normal Roxy path. `speedRate` is handled by canonicalizing the input text once, so it no longer triggers recursive baseline probes or extra guard calls.
