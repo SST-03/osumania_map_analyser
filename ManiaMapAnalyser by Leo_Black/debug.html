@@ -79,6 +79,99 @@
             font-family: inherit;
         }
 
+        select {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 7px 9px;
+            color: var(--text);
+            background: rgba(15, 20, 36, 0.96);
+            font-family: inherit;
+            min-width: 220px;
+        }
+
+        .estimator-debug-panel {
+            margin: 14px 0;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.18);
+        }
+
+        .estimator-debug-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .estimator-debug-header h2 {
+            margin: 0 0 6px;
+            font-size: 18px;
+        }
+
+        .estimator-debug-meta,
+        .estimator-debug-note,
+        .estimator-debug-empty,
+        .estimator-debug-running {
+            color: var(--soft);
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        .estimator-debug-actions,
+        .estimator-debug-slot-top,
+        .estimator-debug-counter,
+        .estimator-debug-result-line {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .estimator-debug-actions {
+            justify-content: flex-end;
+        }
+
+        .estimator-debug-slots {
+            display: grid;
+            gap: 10px;
+        }
+
+        .estimator-debug-slot {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .estimator-debug-slot-top {
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .estimator-debug-counter span,
+        .estimator-debug-result-line span {
+            color: var(--soft);
+            font-size: 12px;
+        }
+
+        .estimator-debug-result-line {
+            margin-top: 8px;
+        }
+
+        .estimator-debug-result-line strong {
+            color: var(--ok);
+            font-size: 15px;
+        }
+
+        .estimator-debug-error {
+            margin-top: 8px;
+            color: var(--warn);
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
         pre {
             margin: 0;
             white-space: pre-wrap;
@@ -104,17 +197,23 @@
             <button id="pause-btn" type="button">Pause</button>
             <button id="clear-btn" type="button">Clear</button>
         </div>
+        <div id="estimator-debug-root"></div>
         <pre id="payload">Waiting for websocket data...</pre>
     </main>
 
     <script type="module">
         import WebSocketManager from "./js/app/socket.js";
+        import { createEstimatorDebugPanel } from "./js/debug/estimatorDebugPanel.js";
 
         const payloadEl = document.getElementById("payload");
         const connEl = document.getElementById("conn");
         const countEl = document.getElementById("count");
         const pauseBtn = document.getElementById("pause-btn");
         const clearBtn = document.getElementById("clear-btn");
+        const estimatorPanel = createEstimatorDebugPanel({
+            root: document.getElementById("estimator-debug-root"),
+            socketHost: "127.0.0.1:24050",
+        });
 
         let paused = false;
         let messageCount = 0;
@@ -144,6 +243,7 @@
 
         socket.api_v2((data) => {
             setConnectionState("ok", "Connected");
+            estimatorPanel.handleSocketPayload(data);
             if (paused) {
                 return;
             }

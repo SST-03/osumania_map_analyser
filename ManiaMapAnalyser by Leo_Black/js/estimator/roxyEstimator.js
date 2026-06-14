@@ -13,6 +13,7 @@ const ROXY_CONFIG = Object.freeze({
     npsWindowsMs: Object.freeze([250, 500, 1000, 4000]),
     sectionMs: 400,
     sectionDecay: 0.9,
+    sectionEmaAlpha: 0.15,
     correctionClamp: 1.25,
     rawMap: Object.freeze({
         p02: 3.9947,
@@ -581,9 +582,12 @@ function computeSectionAggregate(rows, localRaw) {
 
     const firstTime = rows[0].t;
     const sectionMax = [];
+    let smoothedRaw = Number(localRaw[0]) || 0;
     for (let i = 0; i < rows.length; i += 1) {
         const section = Math.max(0, Math.floor((rows[i].t - firstTime) / ROXY_CONFIG.sectionMs));
-        sectionMax[section] = Math.max(sectionMax[section] || 0, localRaw[i] || 0);
+        const raw = Number(localRaw[i]) || 0;
+        smoothedRaw += ROXY_CONFIG.sectionEmaAlpha * (raw - smoothedRaw);
+        sectionMax[section] = Math.max(sectionMax[section] || 0, smoothedRaw);
     }
 
     const values = sectionMax.filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => b - a);
@@ -747,7 +751,9 @@ function computeRoxyCurve(rows, taps, activity) {
         const body = Math.max(0, row.rowSize - 2) * strainRate(dtRow, 150, 80, 0.85);
         const chordIn = rowChord * (1 + 0.18 * speedIn) + 0.22 * sameHandChord + body;
         const chordjackIn = rowChord * ((0.55 * jackIn) + (0.30 * sameHandOverlap) + (0.15 * handIn));
-        const rhythmChaos = Math.min(2, Math.abs(Math.log2((dtRow + 24) / (prevDtRow + 24)))) / 2;
+        const rhythmChaos = i > 0
+            ? Math.min(2, Math.abs(Math.log2((dtRow + 24) / (prevDtRow + 24)))) / 2
+            : 0;
         const techIn = (0.32 * rhythmChaos)
             + (0.24 * entropy750)
             + (0.24 * transitionEntropy750)
@@ -1045,6 +1051,13 @@ function computeReferenceGapCorrection(referencePredictions, structuralNumeric, 
             * ((features[i] - ROXY_REFERENCE_GAP_FEATURE_MEAN[i]) / scale);
     }
     return clamp(value, -0.30, 0.30) * ROXY_REFERENCE_GAP_CORRECTION_SCALE;
+}
+
+function computeAzusaHighGapLift(referencePredictions, baseNumeric) {
+    const base = Number(baseNumeric);
+    const azusa = Number(referencePredictions?.Azusa);
+    if (!Number.isFinite(base) || !Number.isFinite(azusa)) return 0;
+    return 0.05 * gate(azusa - base, 0.35, 0.95);
 }
 
 function resultNumeric(result) {
@@ -1485,6 +1498,10 @@ export function runRoxyEstimatorFromText(osuText, options = {}) {
             )
             : 0;
         unguardedNumeric = clamp(unguardedNumeric + referenceGapCorrection, -2, ROXY_NUMERIC_OUTPUT_MAX);
+        const azusaHighGapLift = odDetails.flag == null
+            ? computeAzusaHighGapLift(metaDetails.referencePredictions, unguardedNumeric)
+            : 0;
+        unguardedNumeric = clamp(unguardedNumeric + azusaHighGapLift, -2, ROXY_NUMERIC_OUTPUT_MAX);
         const finalNumeric = Number(unguardedNumeric.toFixed(2));
         const estDiff = numericToRoxyRcLabel(finalNumeric);
 
@@ -1528,6 +1545,7 @@ export function runRoxyEstimatorFromText(osuText, options = {}) {
                     correction: fmt4(odCorrection),
                 },
                 referenceGapCorrection: fmt4(referenceGapCorrection),
+                azusaHighGapLift: fmt4(azusaHighGapLift),
                 speedRateMode: {
                     mode: "time-scale-only",
                     speedRate: fmt4(speedRate),

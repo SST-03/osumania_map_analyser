@@ -4,6 +4,16 @@ import { runAzusaEstimatorFromText } from "./azusaEstimator.js";
 import { runRoxyEstimatorFromText } from "./roxyEstimator.js";
 
 const MIXED_SUPPORTED_KEYS = new Set([4, 6, 7]);
+const AZUSA_RC_PREFERENCE = Object.freeze({
+    balancedHandScreenMaxBias: 0.006,
+    balancedHandMaxBias: 0.003,
+    azusaHigherScreenMinDelta: 0.25,
+    azusaHigherMinDelta: 0.4,
+    anchorHeavyScreenMinRate: 0.72,
+    anchorHeavyMinRate: 0.78,
+    azusaLowerScreenMaxDelta: -0.55,
+    azusaLowerMaxDelta: -0.7,
+});
 
 function modeTagFromLnRatio(lnRatio) {
     if (!Number.isFinite(lnRatio)) {
@@ -110,6 +120,75 @@ function canUseRcResult(result) {
     return true;
 }
 
+function resultNumericValue(result) {
+    const raw = result?.numericDifficulty;
+    if (raw === null || raw === undefined) return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+}
+
+function debugStatValue(result, name) {
+    const raw = result?.debug?.stats?.[name];
+    if (raw === null || raw === undefined) return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+}
+
+function debugReferenceValue(result, name) {
+    const raw = result?.debug?.meta?.references?.[name];
+    if (raw === null || raw === undefined) return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+}
+
+function shouldEvaluateAzusaRcPreference(roxyResult) {
+    if (!canUseRcResult(roxyResult)) {
+        return false;
+    }
+
+    const roxyNumeric = resultNumericValue(roxyResult);
+    const azusaReference = debugReferenceValue(roxyResult, "Azusa");
+    const handBias = debugStatValue(roxyResult, "handBias");
+    const anchorRate = debugStatValue(roxyResult, "anchorRate");
+    if (roxyNumeric == null || azusaReference == null) {
+        return false;
+    }
+
+    const delta = azusaReference - roxyNumeric;
+    const balancedHandCandidate = handBias != null
+        && handBias <= AZUSA_RC_PREFERENCE.balancedHandScreenMaxBias
+        && delta >= AZUSA_RC_PREFERENCE.azusaHigherScreenMinDelta;
+    const anchorHeavyCandidate = anchorRate != null
+        && anchorRate >= AZUSA_RC_PREFERENCE.anchorHeavyScreenMinRate
+        && delta <= AZUSA_RC_PREFERENCE.azusaLowerScreenMaxDelta;
+
+    return balancedHandCandidate || anchorHeavyCandidate;
+}
+
+export function shouldPreferAzusaRcResult(roxyResult, azusaResult) {
+    if (!canUseRcResult(roxyResult) || !canUseRcResult(azusaResult)) {
+        return false;
+    }
+
+    const roxyNumeric = resultNumericValue(roxyResult);
+    const azusaNumeric = resultNumericValue(azusaResult);
+    const handBias = debugStatValue(roxyResult, "handBias");
+    const anchorRate = debugStatValue(roxyResult, "anchorRate");
+    if (roxyNumeric == null || azusaNumeric == null) {
+        return false;
+    }
+
+    const delta = azusaNumeric - roxyNumeric;
+    const balancedHandAzusaLift = handBias != null
+        && handBias <= AZUSA_RC_PREFERENCE.balancedHandMaxBias
+        && delta >= AZUSA_RC_PREFERENCE.azusaHigherMinDelta;
+    const anchorHeavyRoxyDamp = anchorRate != null
+        && anchorRate >= AZUSA_RC_PREFERENCE.anchorHeavyMinRate
+        && delta <= AZUSA_RC_PREFERENCE.azusaLowerMaxDelta;
+
+    return balancedHandAzusaLift || anchorHeavyRoxyDamp;
+}
+
 export function runMixedEstimatorFromText(osuText, options = {}) {
     const sunnyBaseline = options.precomputedSunnyResult || runSunnyEstimatorFromText(osuText, options);
     const columnCount = Number(sunnyBaseline.columnCount);
@@ -121,6 +200,7 @@ export function runMixedEstimatorFromText(osuText, options = {}) {
     }
 
     const { inEnabled, hoEnabled } = parseCvtFlags(options.cvtFlag);
+    const hasExplicitOd = options.odFlag !== null && options.odFlag !== undefined;
     const mixedModeTag = hoEnabled ? "RC" : modeTagFromLnRatio(Number(sunnyBaseline.lnRatio));
 
     if (mixedModeTag === "RC" && columnCount !== 4) {
@@ -146,6 +226,19 @@ export function runMixedEstimatorFromText(osuText, options = {}) {
             estDiff = roxyResult.estDiff;
             numericDifficulty = roxyResult.numericDifficulty;
             numericDifficultyHint = roxyResult.numericDifficultyHint;
+            if (!inEnabled && !hasExplicitOd && shouldEvaluateAzusaRcPreference(roxyResult)) {
+                const azusaResult = tryRunAzusaFallback(osuText, {
+                    ...options,
+                    forceSunnyReferenceHo: false,
+                    precomputedSunnyResult: sunnyBaseline,
+                });
+                if (shouldPreferAzusaRcResult(roxyResult, azusaResult)) {
+                    selectedRework = azusaResult;
+                    estDiff = azusaResult.estDiff;
+                    numericDifficulty = azusaResult.numericDifficulty;
+                    numericDifficultyHint = azusaResult.numericDifficultyHint;
+                }
+            }
         } else if (!inEnabled) {
             const azusaResult = tryRunAzusaFallback(osuText, {
                 ...options,
