@@ -19,8 +19,9 @@ Invalid results use the same estimator result shape as valid results, but return
 ## 2. Pipeline
 
 ```text
-Parse .osu text
+Read .osu text
   -> canonicalize the time axis for speedRate
+  -> parse canonicalized .osu text
   -> build 4K tap rows
   -> compute row, hand, column, rhythm, entropy, and NPS features
   -> update seven structural strain streams
@@ -29,17 +30,17 @@ Parse .osu text
   -> call Azusa with those precomputed references
   -> build meta features from Azusa/Daniel/Roxy; keep Sunny slot disabled
   -> evaluate ridge linear calibration head
-  -> apply OD and high-reference structural floor
+  -> apply explicit OD override correction, high-reference structural floor, and reference-gap residual correction
   -> format RC label and optional Azusa graph
 ```
 
-The reference order is deliberately fixed:
+The reference order is deliberately fixed on the canonicalized, OD-neutral analysis text:
 
-1. Reuse `precomputedSunnyResult` when available; otherwise compute Sunny once.
-2. Reuse `precomputedDanielResult` when available; otherwise compute Daniel once.
+1. Compute Sunny once for Azusa reuse and optional graph support.
+2. Reuse `precomputedDanielResult` when it is valid for the same analysis path; otherwise compute Daniel once.
 3. Call Azusa with both precomputed results.
 
-This keeps Roxy, Azusa, Daniel, and Sunny aligned without recomputing Daniel or Sunny inside Azusa. Sunny is not treated as a separate voting signal in the meta head.
+This keeps Roxy, Azusa, Daniel, and Sunny aligned without recomputing Daniel or Sunny inside Azusa. Mixed may still pass its Sunny baseline into Roxy, but the current public Roxy path clears that external Sunny before the meta reference call so the reference layer remains OD-neutral and canonicalized. Sunny is not treated as a separate voting signal in the meta head.
 
 ## 3. Basic Functions
 
@@ -314,11 +315,39 @@ The generated meta head is a standardized ridge linear model. It is intentionall
 
 The Sunny feature slots remain in the schema for compatibility with the generated feature list, but the live Sunny prediction is set unavailable before feature construction. Those slots therefore carry fallback values plus `has_Sunny = 0`, not a live Sunny vote.
 
-After meta evaluation, a structural backstop prevents the calibrated value from falling far below Roxy's own structural score. The backstop is gated from structural numeric `10.5` to `12.5` and targets `structuralNumeric - 0.15`, so it does not expose the steep low-difficulty part of the structural isotonic mapping.
+After meta evaluation, a structural backstop prevents the calibrated value from falling slightly below Roxy's own structural score. The backstop is gated from structural numeric `12.25` to `14.0`, targets `structuralNumeric - 0.15`, and only applies when the gap is positive but no larger than `0.35`. This keeps it from acting as a broad high-difficulty special case.
+
+After OD correction and the high-reference structural floor, Roxy applies a very small reference-gap residual correction only when no explicit OD override is present. The correction compares the current unguarded output with Azusa, Daniel, and the structural score:
+
+```text
+azusaGap      = Azusa - base
+danielGap     = Daniel - base
+structuralGap = structuralNumeric - base
+
+features = [
+  azusaGap,
+  danielGap,
+  structuralGap,
+  abs(azusaGap),
+  abs(danielGap),
+  azusaGap * chordRate,
+  azusaGap * rotationRate,
+  azusaGap / (sameHandQ10 + 1),
+  danielGap * chordRate,
+  structuralGap * gate(avgNps, 12, 24)
+]
+
+referenceGapCorrection =
+  clamp(ridge(features), -0.30, 0.30) * 0.33
+```
+
+The final contribution is therefore limited to about `+-0.10` numeric difficulty. This keeps the correction from becoming another benchmark selector while recovering a small amount of residual error where all references disagree with the current calibrated output in the same direction.
 
 ## 12. OD Override
 
-Roxy accepts `odFlag`, `OD`, `od`, or `overallDifficulty` in the options object. Supported values are:
+Roxy accepts `odFlag`, `OD`, `od`, or `overallDifficulty` in the options object. OD only changes the estimate when one of those override values is explicitly supplied. Parsed map OD is retained for debug output and for deriving `HR`/`EZ`, but a normal no-override call has `odCorrection = 0`.
+
+Supported override values are:
 
 - `HR`
 - `EZ`
@@ -335,16 +364,20 @@ effectiveOD = numeric override               otherwise
 rawWindow = 0.3 * sqrt((64.5 - ceil(od * 3)) / 500)
 judgeWindow(od) = min(rawWindow, 0.6 * (rawWindow - 0.09) + 0.09)
 
-pressureRatio = clamp(baseWindow / effectiveWindow, 0.55, 1.85)
-odCorrection = clamp(
-  log(pressureRatio)
-* (3.20 + 1.90 * gate(numeric, 6, 18) + 0.60 * gate(numeric, 14, 18.4)),
-  -2.20,
-  2.20
-)
+neutralWindow = judgeWindow(9)
+pressureRatio = clamp(neutralWindow / effectiveWindow, 0.55, 1.85)
+
+odCorrection =
+  0 if no explicit override
+  else clamp(
+    log(pressureRatio)
+  * (3.20 + 1.90 * gate(numeric, 6, 18) + 0.60 * gate(numeric, 14, 18.4)),
+    -2.20,
+    2.20
+  )
 ```
 
-OD is applied after the meta model and before final output. The correction uses OD9 as the neutral judgement-window baseline, so two maps with the same arrangement and different base OD keep the same neutral reference estimate before the OD pressure term is added. The meta reference layer is also kept OD-neutral because the training data does not contain reliable OD-varied samples; feeding OD-shifted reference predictions into that model can create unstable reversals.
+Explicit OD correction is applied after the meta model and before final output. The correction uses OD9 as the neutral judgement-window baseline, so two maps with the same arrangement and different file OD keep the same no-override reference estimate. Only an explicit `HR`, `EZ`, or numeric DA-style OD override adds judgement pressure. The meta reference layer is also kept OD-neutral because the training data does not contain reliable OD-varied samples; feeding OD-shifted reference predictions into that model can create unstable reversals.
 
 ## 13. High-Reference Structural Floor
 
@@ -354,15 +387,21 @@ The meta calibration layer can under-read high-density RC charts when only Azusa
 - `avgNps >= 25`
 - `chordRate >= 0.70`
 - `sameHandQ10 <= 95`
-- combined density/chord/three-note/jack/chordjack/fast-hand/duration pressure is at least `0.30`
+- combined density/chord/three-note/jack/chordjack/fast-hand/duration pressure has entered the activation gate; the pressure gate rises from `0.22` to `0.46`
 
-The floor is the maximum of an Azusa-relative floor and a structural pressure floor, with only a small negative OD damp:
+The floor interpolates from a structural pressure target toward an Azusa-relative target, with extra activation when Sunny or Daniel is unavailable and a small negative OD damp:
 
 ```text
+pressureGate = gate(pressure, 0.22, 0.46)
+activation =
+  clamp(pressureGate * gate(Azusa, 17.0, 18.0) + missingReferenceBoost, 0, 1)
 confidence = pressureGate * gate(Azusa, 17.0, 20.0)
 referenceFloor = Azusa - (0.45 - 0.25 * confidence)
 structuralFloor = 16.65 + 1.55 * confidence + 0.35 * rawGate + 0.25 * highNpsGate
-floor = max(referenceFloor, structuralFloor) + min(0, odCorrection) * 0.25
+structuralTarget = structuralFloor + min(0, odCorrection) * 0.25
+referenceTarget = max(referenceFloor, structuralFloor) + min(0, odCorrection) * 0.25
+floor = structuralTarget + (referenceTarget - structuralTarget) * activation
+floor = clamp(floor, 16.8, min(18.65, Azusa + 0.30))
 ```
 
 This is a targeted structural-reference guard for dense RC outliers, not a general replacement for the meta model.

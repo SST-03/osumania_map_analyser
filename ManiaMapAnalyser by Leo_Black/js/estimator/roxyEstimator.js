@@ -181,6 +181,8 @@ function computeOdDetails(baseOd, odFlag) {
 }
 
 function computeOdCorrection(odDetails, numeric) {
+    if (odDetails?.flag == null) return 0;
+
     const ratio = Number(odDetails?.pressureRatio);
     if (!Number.isFinite(ratio) || Math.abs(ratio - 1) < 1e-6) return 0;
 
@@ -947,6 +949,44 @@ function computeRoxyNumeric(curve) {
 const ROXY_META_ALGOS = Object.freeze(["Azusa", "Sunny", "Daniel", "Roxy"]);
 const ROXY_REFERENCE_BUCKET_SIZE = 1.0;
 const ROXY_DISABLED_META_REFERENCES = Object.freeze(new Set(["Sunny"]));
+const ROXY_REFERENCE_GAP_FEATURE_MEAN = Object.freeze([
+    0.07809006,
+    0.29256211,
+    -0.02192547,
+    0.26793478,
+    0.32663043,
+    0.04266659,
+    0.02789153,
+    0.00078517,
+    0.14369285,
+    -0.51494749,
+]);
+const ROXY_REFERENCE_GAP_FEATURE_SCALE = Object.freeze([
+    0.34015787,
+    0.32576873,
+    2.49325258,
+    0.22364344,
+    0.29159975,
+    0.17146345,
+    0.19191325,
+    0.00597972,
+    0.19899545,
+    1.40898167,
+]);
+const ROXY_REFERENCE_GAP_BETA = Object.freeze([
+    -0.0060869565,
+    0.0605011303,
+    -0.1187884725,
+    -0.0070736868,
+    -0.0590087101,
+    0.1468674261,
+    0.0562217676,
+    -0.1003859899,
+    0.1116677492,
+    -0.0281818287,
+    0.0297534048,
+]);
+const ROXY_REFERENCE_GAP_CORRECTION_SCALE = 0.33;
 
 function toFeatureNumber(value) {
     const numeric = Number(value);
@@ -963,6 +1003,48 @@ function quantizeFeature(value, step) {
     const size = Number(step);
     if (!Number.isFinite(numeric) || !Number.isFinite(size) || size <= 0) return 0;
     return Number((Math.round(numeric / size) * size).toFixed(4));
+}
+
+function computeReferenceGapCorrection(referencePredictions, structuralNumeric, baseNumeric, stats) {
+    const base = Number(baseNumeric);
+    if (!Number.isFinite(base)) return 0;
+
+    const azusaRaw = referencePredictions?.Azusa;
+    const danielRaw = referencePredictions?.Daniel;
+    const hasAzusa = azusaRaw != null && Number.isFinite(Number(azusaRaw));
+    const hasDaniel = danielRaw != null && Number.isFinite(Number(danielRaw));
+    if (!hasAzusa && !hasDaniel) return 0;
+
+    const azusa = hasAzusa ? Number(azusaRaw) : base;
+    const daniel = hasDaniel ? Number(danielRaw) : base;
+    const structural = Number.isFinite(Number(structuralNumeric)) ? Number(structuralNumeric) : base;
+    const azusaGap = azusa - base;
+    const danielGap = daniel - base;
+    const structuralGap = structural - base;
+    const chordRate = toFeatureNumber(stats?.chordRate);
+    const rotationRate = toFeatureNumber(stats?.rotationRate);
+    const sameHandQ10 = toFeatureNumber(stats?.sameHandQ10);
+    const avgNpsGate = gate(toFeatureNumber(stats?.avgNps), 12, 24);
+    const features = [
+        azusaGap,
+        danielGap,
+        structuralGap,
+        Math.abs(azusaGap),
+        Math.abs(danielGap),
+        azusaGap * chordRate,
+        azusaGap * rotationRate,
+        azusaGap / (sameHandQ10 + 1),
+        danielGap * chordRate,
+        structuralGap * avgNpsGate,
+    ];
+
+    let value = ROXY_REFERENCE_GAP_BETA[0];
+    for (let i = 0; i < features.length; i += 1) {
+        const scale = ROXY_REFERENCE_GAP_FEATURE_SCALE[i] || 1;
+        value += ROXY_REFERENCE_GAP_BETA[i + 1]
+            * ((features[i] - ROXY_REFERENCE_GAP_FEATURE_MEAN[i]) / scale);
+    }
+    return clamp(value, -0.30, 0.30) * ROXY_REFERENCE_GAP_CORRECTION_SCALE;
 }
 
 function resultNumeric(result) {
@@ -1394,6 +1476,15 @@ export function runRoxyEstimatorFromText(osuText, options = {}) {
         if (highReferenceFloor != null) {
             unguardedNumeric = Math.max(unguardedNumeric, highReferenceFloor.floor);
         }
+        const referenceGapCorrection = odDetails.flag == null
+            ? computeReferenceGapCorrection(
+                metaDetails.referencePredictions,
+                structuralNumeric,
+                unguardedNumeric,
+                curve.stats,
+            )
+            : 0;
+        unguardedNumeric = clamp(unguardedNumeric + referenceGapCorrection, -2, ROXY_NUMERIC_OUTPUT_MAX);
         const finalNumeric = Number(unguardedNumeric.toFixed(2));
         const estDiff = numericToRoxyRcLabel(finalNumeric);
 
@@ -1436,6 +1527,7 @@ export function runRoxyEstimatorFromText(osuText, options = {}) {
                     pressureRatio: fmt4(odDetails.pressureRatio),
                     correction: fmt4(odCorrection),
                 },
+                referenceGapCorrection: fmt4(referenceGapCorrection),
                 speedRateMode: {
                     mode: "time-scale-only",
                     speedRate: fmt4(speedRate),
