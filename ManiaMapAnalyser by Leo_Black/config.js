@@ -90,7 +90,7 @@ export const APP_CONFIG = {
         useSvDetection: true,
         showModeTagCapsule: true,
         enableNumericDifficulty: true,
-        hideCardDuringPlay: false,
+        cardVisibility: "Always",
         cardOpacity: "95%",
         cardRadius: "Medium",
         cardBgBlur: "4px",

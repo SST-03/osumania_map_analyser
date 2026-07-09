@@ -412,9 +412,10 @@ export function createSettingsParsers(appConfig) {
         return normalizeBooleanSetting(value, appConfig.defaults.enableNumericDifficulty);
     }
 
-    function parseHideCardDuringPlayValue(settingsPayload) {
-        const value = extractSettingValue(settingsPayload, "hideCardDuringPlay");
-        return normalizeBooleanSetting(value, appConfig.defaults.hideCardDuringPlay);
+    function parseCardVisibilityValue(settingsPayload) {
+        const value = extractSettingValue(settingsPayload, "cardVisibility");
+        const valid = ["DuringPlay", "OutsidePlay", "Always"];
+        return valid.includes(value) ? value : appConfig.defaults.cardVisibility;
     }
 
     function parseEnableOsuThemeValue(settingsPayload) {
@@ -555,7 +556,7 @@ export function createSettingsParsers(appConfig) {
         parseEnableStatusMarqueeValue,
         parseShowModeTagCapsuleValue,
         parseEnableNumericDifficultyValue,
-        parseHideCardDuringPlayValue,
+        parseCardVisibilityValue,
         parseEnableOsuThemeValue,
         parseEnableFloatingTrianglesValue,
         parseEnableCoverArtValue,

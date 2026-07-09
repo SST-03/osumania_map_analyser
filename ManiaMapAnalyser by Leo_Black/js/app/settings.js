@@ -27,7 +27,7 @@ import {
     parseEtternaVersionValue,
     parseCompanellaEtternaVersionValue,
     parseEnableNumericDifficultyValue,
-    parseHideCardDuringPlayValue,
+    parseCardVisibilityValue,
     parseShowModeTagCapsuleValue,
     parseEnableUpdateCheckValue,
     parseReverseCardExtendDirectionValue,
@@ -564,10 +564,11 @@ export function applyEnableNumericDifficultySetting(value) {
     return changed;
 }
 
-export function applyHideCardDuringPlaySetting(value) {
-    const next = normalizeBooleanSetting(value, APP_CONFIG.defaults.hideCardDuringPlay);
-    const changed = state.hideCardDuringPlay !== next;
-    state.hideCardDuringPlay = next;
+export function applyCardVisibilitySetting(value) {
+    const valid = ["DuringPlay", "OutsidePlay", "Always"];
+    const next = valid.includes(value) ? value : APP_CONFIG.defaults.cardVisibility;
+    const changed = state.cardVisibility !== next;
+    state.cardVisibility = next;
     updateCardPlayVisibility();
     return changed;
 }
@@ -683,7 +684,7 @@ export function setupSettingsCommandListener() {
         const vibroChanged = applyIf("VibroDetection", applyVibroDetectionSetting, parseVibroDetectionValue(payload));
         const modeTagVisibilityChanged = applyIf("showModeTagCapsule", applyShowModeTagCapsuleSetting, parseShowModeTagCapsuleValue(payload));
         const numericDifficultyChanged = applyIf("enableNumericDifficulty", applyEnableNumericDifficultySetting, parseEnableNumericDifficultyValue(payload));
-        const hideCardDuringPlayChanged = applyIf("hideCardDuringPlay", applyHideCardDuringPlaySetting, parseHideCardDuringPlayValue(payload));
+        const cardVisibilityChanged = applyIf("cardVisibility", applyCardVisibilitySetting, parseCardVisibilityValue(payload));
         const cardOpacityChanged = applyIf("cardOpacity", applyCardOpacitySetting, parseCardOpacityValue(payload));
         const cardRadiusChanged = applyIf("cardRadius", applyCardRadiusSetting, parseCardRadiusValue(payload));
         const cardBgBlurChanged = applyIf("cardBgBlur", applyCardBgBlurSetting, parseCardBgBlurValue(payload));
@@ -719,7 +720,7 @@ export function setupSettingsCommandListener() {
             || vibroChanged
             || modeTagVisibilityChanged
             || numericDifficultyChanged
-            || hideCardDuringPlayChanged
+            || cardVisibilityChanged
             || cardOpacityChanged
             || cardRadiusChanged
             || cardBgBlurChanged
@@ -819,7 +820,7 @@ export async function loadSettings() {
         applyVibroDetectionSetting(parseVibroDetectionValue(source));
         applyShowModeTagCapsuleSetting(parseShowModeTagCapsuleValue(source));
         applyEnableNumericDifficultySetting(parseEnableNumericDifficultyValue(source));
-        applyHideCardDuringPlaySetting(parseHideCardDuringPlayValue(source));
+        applyCardVisibilitySetting(parseCardVisibilityValue(source));
         applyCardOpacitySetting(parseCardOpacityValue(source));
         applyCardRadiusSetting(parseCardRadiusValue(source));
         applyCardBgBlurSetting(parseCardBgBlurValue(source));
@@ -855,7 +856,7 @@ export async function loadSettings() {
             VibroDetection: APP_CONFIG.defaults.vibroDetection,
             showModeTagCapsule: APP_CONFIG.defaults.showModeTagCapsule,
             enableNumericDifficulty: APP_CONFIG.defaults.enableNumericDifficulty,
-            hideCardDuringPlay: APP_CONFIG.defaults.hideCardDuringPlay,
+            cardVisibility: APP_CONFIG.defaults.cardVisibility,
             cardOpacity: APP_CONFIG.defaults.cardOpacity,
             cardRadius: APP_CONFIG.defaults.cardRadius,
             cardBgBlur: APP_CONFIG.defaults.cardBgBlur,

@@ -90,7 +90,8 @@
     - **Metadata Marquee**: 是否启用滚动显示谱面信息功能。
     - **Numeric Difficulty**: 是否显示数值化难度。
         - 将在RC估计算法下于ESTIMATE DIFFICULTY字样后显示数值化难度。
-    - **Hide During Play**: 是否在游玩过程中隐藏卡片。
+    - **Card Visibility**: 控制卡片的显示时机。
+        - 可选值：`DuringPlay`（仅在游玩时显示）、`OutsidePlay`（仅在非游玩时显示）、`Always`（始终显示）。默认值为 `Always`。
     - **Reverse Card Extension**: 是否反转卡片延展方向。
         - 启用后卡片底边保持锚定，扩展时向上生长；关闭时默认向下扩展。
     - **Card Opacity**: 设置卡片整体透明度。

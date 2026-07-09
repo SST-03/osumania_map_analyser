@@ -230,7 +230,19 @@ export function updateCardPlayVisibility() {
         return;
     }
 
-    const shouldHide = state.hideCardDuringPlay && state.isInPlayState;
+    // Always hide the card when on the menu screen.
+    if (state.clientStateName === "menu") {
+        mainCardEl.classList.toggle("card-hidden-by-play", true);
+        mainCardEl.setAttribute("aria-hidden", "true");
+        return;
+    }
+
+    let shouldHide = false;
+    if (state.cardVisibility === "DuringPlay") {
+        shouldHide = !state.isInPlayState;
+    } else if (state.cardVisibility === "OutsidePlay") {
+        shouldHide = state.isInPlayState;
+    }
     mainCardEl.classList.toggle("card-hidden-by-play", shouldHide);
     mainCardEl.setAttribute("aria-hidden", shouldHide ? "true" : "false");
 }

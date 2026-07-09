@@ -173,12 +173,16 @@
 		"value": true
 	},
 	{
-		"uniqueID": "hideCardDuringPlay",
-		"type": "checkbox",
-		"title": "Hide During Play",
-		"description": "Hide the whole card when playing.",
-		"options": [],
-		"value": false
+		"uniqueID": "cardVisibility",
+		"type": "options",
+		"title": "Card Visibility",
+		"description": "Control when the analysis card is shown.",
+		"options": [
+			"DuringPlay",
+			"OutsidePlay",
+			"Always"
+		],
+		"value": "Always"
 	},
 	{
 		"uniqueID": "reverseCardExtendDirection",
