@@ -167,4 +167,5 @@ This algorithm builds on the beatmap itself, combining the results of Daniel and
 - [ZHAO20060708](https://github.com/ZHAO20060708): Provided the polished Lazer theme and Full mode design.
 
 ---------
+This page has been viewed since June 21, 2026, thanks for your support!
 ![:maniamapanalyser](https://count.getloli.com/@:maniamapanalyser?name=%3Amaniamapanalyser&theme=rule34&padding=7&offset=0&align=center&scale=1&pixelated=1&darkmode=auto)
