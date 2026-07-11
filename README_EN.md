@@ -151,7 +151,7 @@ Roxy is a 4K RC meta-structural estimator. Its core consists of two layers: the 
 Please note that as a tree-based model, the GBDT meta-model can exhibit boundary discontinuities: a miniscule change in input features (e.g., a 0.01× speed rate difference) may cross a decision tree split threshold and produce a disproportionately large jump in the output difficulty. Users should be aware of this inherent characteristic of tree-based estimators.
 
 ## Azusa Algorithm Explanation
-This algorithm builds on the beatmap itself, combining the results of Daniel and Suuny Rework, with specific adjustments targeted at 4K RC beatmaps. For more details, please refer to [this document](azusa_algorithm.md) (English).
+This algorithm builds on the beatmap itself, combining the results of Daniel and Suuny Rework, with specific adjustments targeted at 4K RC beatmaps. For more details, please refer to [this document](azusa_algorithm.md).
 
 ## References
 - [tosu](https://tosu.app): The runtime environment and basic framework for this plugin.
