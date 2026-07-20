@@ -106,6 +106,20 @@ export function estDiff(sr, lnRatio, columnCount) {
     return `${rcDiff} || ${lnDiff}`;
 }
 
+export function estDiff2(sr, srLN, columnCount) {
+    const keys = DAN_INDEX[columnCount];
+    if (!keys) return "Unknown difficulty";
+
+    const rcTable = keys.RC[Object.keys(keys.RC)[0]] ?? keys.RC.default;
+    const rcDiff = intervalLookup(sr, rcTable, "Unknown RC difficulty");
+    if (srLN <= 0) return rcDiff;
+    return rcDiff;
+
+    const lnTable = keys.LN[Object.keys(keys.LN)[0]] ?? keys.LN.default;
+    const lnDiff = intervalLookup(srLN, lnTable, "Unknown LN difficulty");
+    return `${rcDiff} || ${lnDiff}`;
+}
+
 export function normalizeReworkResult(result) {
     if (typeof result === "number") {
         if (result === -1) {

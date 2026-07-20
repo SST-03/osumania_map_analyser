@@ -6,6 +6,7 @@ import {
     applyCompanellaToMixedResult,
     runMixedEstimatorFromText,
 } from "../estimator/mixedEstimator.js";
+import { runSunnyWindowEstimatorFromText } from "../estimator/sunnyWindowEstimator.js"
 import { classifyCompanellaDifficulty } from "../estimator/companellaEstimator.js";
 import { calculateInterludeStar } from "../interlude/index.js";
 import { analyzePatternFromText } from "../patterns/service.js";
@@ -242,6 +243,7 @@ export function resetReworkDisplay() {
 }
 
 export async function fetchBeatmapFile(reason) {
+    console.warn("11111")
     const requestSeq = (state.analysisRequestSeq || 0) + 1;
     state.analysisRequestSeq = requestSeq;
     const isStaleRequest = () => requestSeq !== state.analysisRequestSeq;
@@ -427,6 +429,11 @@ export async function fetchBeatmapFile(reason) {
                 nextNumericDifficulty = selectedRework.numericDifficulty;
                 nextNumericDifficultyHint = selectedRework.numericDifficultyHint;
                 pendingMixedCompanellaContext = selectedRework.mixedCompanellaPlan || null;
+            } else if (estimatorAlgorithm === "SunnyWindow") {
+                selectedRework = runSunnyWindowEstimatorFromText(rawText, estimatorOptions);
+                nextEstDiff = selectedRework.estDiff;
+                nextNumericDifficulty = selectedRework.numericDifficulty;
+                nextNumericDifficultyHint = selectedRework.numericDifficultyHint;
             } else {
                 const wp = runInWorker(rawText, { ...estimatorOptions, estimatorAlgorithm: "Sunny" });
                 selectedRework = wp ? await wp : runSunnyEstimatorFromText(rawText, estimatorOptions);
