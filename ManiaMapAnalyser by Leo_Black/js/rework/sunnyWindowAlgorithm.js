@@ -1026,6 +1026,7 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
             currentTime = p.noteStarts[i];
             currentStartIndex = i;
         }
+        if (i < WindowList2[j][0]) continue;
 
         if ((p.noteTypes[i] & 128) !== 0) {
             if (windowStartIndex === -1) windowStartIndex = currentStartIndex;
