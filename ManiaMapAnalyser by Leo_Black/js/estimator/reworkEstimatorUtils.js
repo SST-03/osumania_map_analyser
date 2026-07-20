@@ -113,7 +113,6 @@ export function estDiff2(sr, srLN, columnCount) {
     const rcTable = keys.RC[Object.keys(keys.RC)[0]] ?? keys.RC.default;
     const rcDiff = intervalLookup(sr, rcTable, "Unknown RC difficulty");
     if (srLN <= 0) return rcDiff;
-    return rcDiff;
 
     const lnTable = keys.LN[Object.keys(keys.LN)[0]] ?? keys.LN.default;
     const lnDiff = intervalLookup(srLN, lnTable, "Unknown LN difficulty");
@@ -148,7 +147,7 @@ export function normalizeReworkResult(result) {
     }
 
     if (!Number.isFinite(sr) || !Number.isFinite(lnRatio) || !Number.isFinite(columnCount)) {
-        throw new Error("Invalid estimator output");
+        throw new Error("Invalid estimator output" + sr + lnRatio + columnCount);
     }
 
     return {

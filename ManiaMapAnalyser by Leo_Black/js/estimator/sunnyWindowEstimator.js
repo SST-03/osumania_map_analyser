@@ -12,11 +12,11 @@ export function runSunnyWindowEstimatorFromText(osuText, options = {}) {
     const parsed = normalizeReworkResult(rawResult);
 
     const rawResultLN = calculateLN(osuText, speedRate, odFlag, cvtFlag, { withGraph });
-    const parsedLN = normalizeReworkResult(rawResultLN);
+    const parsedLNStar = rawResultLN === -3 ? 0 : normalizeReworkResult(rawResultLN).star;
 
     return {
         ...parsed,
-        estDiff: estDiff2(parsed.star, parsedLN.star, parsed.columnCount),
+        estDiff: estDiff2(parsed.star, parsedLNStar, parsed.columnCount),
         numericDifficulty: null,
         numericDifficultyHint: null,
     };

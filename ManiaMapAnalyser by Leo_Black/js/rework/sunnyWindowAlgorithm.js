@@ -271,6 +271,21 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
     const timeScale = speedRate !== 0 ? 1 / speedRate : 1;
 
     const LNParts = getLNParts(osuText, speedRate, odFlag, cvtFlag);
+    if (LNParts.length <= 0) {
+        return {
+            status: "NoLN",
+            x: 0,
+            K: 0,
+            T: 0,
+            noteSeq: [],
+            noteSeqByColumn: [],
+            lnSeq: [],
+            tailSeq: [],
+            lnSeqByColumn: [],
+            lnRatio,
+            columnCount,
+        };
+    }
     const noteSeq = [];
 
     for (let LNPartsIndex = 0; LNPartsIndex < LNParts.length; LNPartsIndex++){
@@ -954,10 +969,11 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
 
             if (windowStartIndex === -1 && isLNPercentageValid(riceCount, LNCount)) {
                 windowStartIndex = i;
+                windowEndIndex = j;
             }
             else if (windowStartIndex !== -1) {
                 if (isLNPercentageValid(riceCount, LNCount)) windowEndIndex = j;
-                else {
+                else if (windowEndIndex !== -1) {
                     WindowList1.push([windowStartIndex, windowEndIndex]);
                     windowStartIndex = -1;
                     windowEndIndex = -1;
@@ -995,7 +1011,7 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
             break;
         }
     }
-    windowList1 = null;
+    WindowList1 = null;
 
     // 第三步：剔除米部分，目前剔除了最早的LN
     let WindowList3 = new Array();
@@ -1004,7 +1020,7 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
     let currentStartIndex = -1; // 等效于与当前note同一时间的最左边的note的index
     currentTime = NaN;
     let windowEndTime = -1e308;
-    let j = 0; // WindowList2的index
+    j = 0; // WindowList2的index
     for (let i = WindowList2[0][0]; i < p.columns.length; i += 1) {
         if (p.noteStarts[i] !== currentTime) {
             currentTime = p.noteStarts[i];
@@ -1030,7 +1046,7 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
         }
     }
 
-    windowList2 = null;
+    WindowList2 = null;
     return WindowList3;
 }
 
@@ -1052,6 +1068,7 @@ export function calculateLN(osuText, speedRate = 1.0, odFlag = null, cvtFlag = n
 
     if (status === "Fail") return -1;
     if (status === "NotMania") return -2;
+    if (status === "NoLN") return -3;
     if (!noteSeq.length || K <= 0) return -1;
 
     const { allCorners, baseCorners, ACorners } = getCorners(T, noteSeq);
