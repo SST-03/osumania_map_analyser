@@ -891,9 +891,98 @@ function smoothDForGraph(allCorners, DAll, noteSeq) {
     return Array.from(interpValues(allCorners, uniformTimes, smoothed));
 }
 
-const MIN_WINDOW_LENGTH = 30*1000; // 30s
+
 const MIN_LN_PERCENTAGE = 20; // 20%
 const MIN_LN_DENSITY = MIN_LN_PERCENTAGE * 0.01;
+
+/**
+ * 解析 .osu 文本中的 timing points。
+ * 返回 {timings, isSV}：
+ *   timings = 非继承 timing point 数组 {offset, beatLength, signature}
+ *   isSV = 如果谱面存在复杂 SV（非1.0x速度持续超过2秒），则为 true
+ */
+function parseTimingsAndDetectSV(osuText) {
+    const lines = osuText.split('\n');
+    let inTiming = false;
+    const uninherited = [];
+    let svTotalMs = 0;
+    let svIntervals = 0;
+    let inSV = false;
+    let svStartTime = 0;
+    const SV_EPS = 0.05;
+
+    for (const line of lines) {
+        const t = line.trim();
+        if (t === '[TimingPoints]') { inTiming = true; continue; }
+        if (inTiming && t.startsWith('[')) break;
+        if (!inTiming || t.startsWith('//') || t === '') continue;
+        const parts = t.split(',');
+        const offset = parseFloat(parts[0]);
+        const beatLength = parseFloat(parts[1]);
+        const signature = parseInt(parts[2]) || 4;
+
+        if (beatLength > 0) {
+            uninherited.push({ offset, beatLength, signature });
+        } else {
+            // 继承 timing point：beatLength < 0，速度 = -100 / beatLength
+            const vel = -100 / beatLength;
+            const isNonOne = Math.abs(vel - 1) > SV_EPS;
+            if (isNonOne && !inSV) {
+                svIntervals++;
+                inSV = true;
+                svStartTime = offset;
+            } else if (!isNonOne && inSV) {
+                svTotalMs += offset - svStartTime;
+                inSV = false;
+            }
+        }
+    }
+    // 处理末尾仍在 SV 中的情况
+    if (inSV) svTotalMs += (uninherited.length > 0 ? uninherited[uninherited.length - 1].offset : 0) - svStartTime;
+
+    const timings = uninherited.length > 0 ? uninherited : [{ offset: 0, beatLength: 500, signature: 4 }];
+    const isSV = svIntervals > 1 && svTotalMs > 2000;
+    return { timings, isSV };
+}
+
+/**
+ * 计算给定时间戳处的单位长度（4小节）的毫秒数。
+ */
+function getUnitLength(timings, timeMs) {
+    let active = timings[0];
+    for (const tp of timings) {
+        if (tp.offset <= timeMs) active = tp;
+        else break;
+    }
+    return active.signature * active.beatLength * 4;
+}
+
+/**
+ * 计算 [timeStart, timeEnd) 范围内的 LN 时长覆盖。
+ * 返回 LN 占据的总毫秒数（合并重叠区间，不重复计算）。
+ */
+function computeLNDuration(p, timeStart, timeEnd, noteStartIdx, noteEndIdx) {
+    const intervals = [];
+    for (let k = noteStartIdx; k <= noteEndIdx; k++) {
+        if (p.noteStarts[k] >= timeEnd) break;
+        if ((p.noteTypes[k] & 128) !== 0) {
+            const s = Math.max(p.noteStarts[k], timeStart);
+            const e = Math.min(p.noteEnds[k], timeEnd);
+            if (e > s) intervals.push([s, e]);
+        }
+    }
+    // 合并重叠区间
+    intervals.sort((a, b) => a[0] - b[0]);
+    let merged = 0;
+    let curStart = -1, curEnd = -1;
+    for (const [s, e] of intervals) {
+        if (curStart === -1) { curStart = s; curEnd = e; }
+        else if (s <= curEnd) { curEnd = Math.max(curEnd, e); }
+        else { merged += curEnd - curStart; curStart = s; curEnd = e; }
+    }
+    if (curStart !== -1) merged += curEnd - curStart;
+    return merged;
+}
 
 function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
     const pObj = new OsuFileParser(osuText);
@@ -930,120 +1019,169 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
     if (p.status === "Fail" || p.status === "NotMania") return new Array();
 
     const speedRate = _speedRate !== 0 ? _speedRate : 1;
-    // p.noteStarts[j]/speedRate > p.noteStarts[i]/speedRate + MIN_WINDOW_LENGTH
-    // 等效于 p.noteStarts[j] > p.noteStarts[i] + MIN_WINDOW_LENGTH * speedRate
-    const MIN_WINDOW_LENGTH_AFTER_SCALE = MIN_WINDOW_LENGTH * speedRate;
 
-    function isLNPercentageValid(riceCount, LNCount) {return (LNCount / (riceCount + LNCount)) > MIN_LN_DENSITY;}
+    // 解析 timing points 并检测 SV
+    const { timings: tpTimings, isSV } = parseTimingsAndDetectSV(osuText);
 
-    // 第一步：框出所有区间
-    let currentTime = undefined;
-    let riceCount = 0;
-    let LNCount = 0;
-    let windowStartIndex = -1;
-    let windowEndIndex = -1;
+    // SV 回退：复杂 SV → 固定5秒区块；否则 → 4小节区块
+    const SV_FIXED_BLOCK = 5000;
+    function getBlockLength(timeMs) {
+        if (isSV) return SV_FIXED_BLOCK * speedRate;
+        return getUnitLength(tpTimings, timeMs) * speedRate;
+    }
+
+    // 判断 LN 占比是否达到阈值（基于音符数量）
+    function isLNPercentageValid(riceCount, LNCount) {
+        if (riceCount + LNCount === 0) return false;
+        return (LNCount / (riceCount + LNCount)) > MIN_LN_DENSITY;
+    }
+
+    /**
+     * 判断区块内 LN 时长覆盖是否超过阈值。
+     * 使用合并的 LN 区间避免重复计算。
+     */
+    function isLNDurationValid(noteStartIdx, noteEndIdx, blockStart, blockEnd, threshold) {
+        if (noteStartIdx === -1) return false;
+        const duration = computeLNDuration(p, blockStart, blockEnd, noteStartIdx, noteEndIdx);
+        return duration / (blockEnd - blockStart) > threshold;
+    }
+
+    /**
+     * 统计 [timeStart, timeEnd) 范围内的音符数量（从 startIndex 开始扫描）。
+     * 返回 {riceCount, lnCount, noteStartIdx, noteEndIdx, nextIndex}
+     */
+    function countNotesInRange(timeStart, timeEnd, startIndex) {
+        let rc = 0, ln = 0;
+        let noteStartIdx = -1, noteEndIdx = -1;
+        let idx = startIndex;
+        while (idx < p.columns.length && p.noteStarts[idx] < timeEnd) {
+            if (p.noteStarts[idx] >= timeStart) {
+                if ((p.noteTypes[idx] & 128) === 0) rc++; else ln++;
+                if (noteStartIdx === -1) noteStartIdx = idx;
+                noteEndIdx = idx;
+            }
+            idx++;
+        }
+        return { riceCount: rc, lnCount: ln, noteStartIdx, noteEndIdx, nextIndex: idx };
+    }
+
+    // 第一步：按单位长度步进，框出所有区间
+    const firstNoteTime = p.noteStarts[0];
+    const lastNoteTime = p.noteStarts[p.columns.length - 1];
+    let blockStart = firstNoteTime;
     let WindowList1 = new Array();
-    let j = 0; // 音符i在处理倍速后向后MIN_WINDOW_LENGTH毫秒内的最后一个音符的位置
-    for (let i = 0; i < p.columns.length; i += 1) {
-        /*
-        const k = p.columns[i];
-        let h = p.noteStarts[i];
-        let t = (p.noteTypes[i] & 128) !== 0 ? p.noteEnds[i] : -1;
-        h = Math.floor(h * timeScale);
-        t = t >= 0 ? Math.floor(t * timeScale) : t;
-        noteSeq.push([k, h, t]);
-        */
-        if (p.noteStarts[i] !== currentTime) {
-            currentTime = p.noteStarts[i];
-            while (j < p.columns.length) {
-                j++;
-                if (j >= p.columns.length) break;
-                if (p.noteStarts[j] > currentTime + MIN_WINDOW_LENGTH_AFTER_SCALE) {j--; break;}
-                if ((p.noteTypes[j] & 128) === 0) riceCount++; else LNCount++;
-            };
 
-            if (j >= p.columns.length) {
-                if (windowStartIndex !== -1) WindowList1.push([windowStartIndex, windowEndIndex]);
-                break;
-            } // 窗口够到了最后一个音符的开头，即所有音符都被尝试覆盖过了；这个break会跳出for循环
+    let scanIndex = 0;
 
-            if (windowStartIndex === -1 && isLNPercentageValid(riceCount, LNCount)) {
-                windowStartIndex = i;
-                windowEndIndex = j;
-            }
-            else if (windowStartIndex !== -1) {
-                if (isLNPercentageValid(riceCount, LNCount)) windowEndIndex = j;
-                else if (windowEndIndex !== -1) {
-                    WindowList1.push([windowStartIndex, windowEndIndex]);
-                    windowStartIndex = -1;
-                    windowEndIndex = -1;
-                }
-            }
+    while (blockStart <= lastNoteTime) {
+        const blockLen = getBlockLength(blockStart);
+        const blockEnd = blockStart + blockLen;
+
+        const block = countNotesInRange(blockStart, blockEnd, scanIndex);
+        scanIndex = block.nextIndex;
+
+        if (block.noteStartIdx === -1) {
+            blockStart = blockEnd;
+            continue;
         }
 
-        if ((p.noteTypes[i] & 128) === 0) riceCount--; else LNCount--; // 范围的开头离开了那个音符，减去对应的Count
+        if (isLNPercentageValid(block.riceCount, block.lnCount)) {
+            // 强区块：向后扩展，条件是下一个区块 >25% LN 时长 且 合并后 >20% LN 占比
+            let extendEnd = blockEnd;
+            let extendNoteEnd = block.noteEndIdx;
+            let accumRC = block.riceCount;
+            let accumLN = block.lnCount;
+
+            while (true) {
+                const nextStart = extendEnd;
+                const nextEnd = nextStart + getBlockLength(nextStart);
+                const peek = countNotesInRange(nextStart, nextEnd, scanIndex);
+
+                if (peek.noteStartIdx === -1) break;
+                // 基于时长判断：下一个区块 LN 时长覆盖 >25%？
+                if (!isLNDurationValid(peek.noteStartIdx, peek.noteEndIdx, nextStart, nextEnd, 0.25)) break;
+                // 合并后 LN 占比 >20%？
+                if (!isLNPercentageValid(accumRC + peek.riceCount, accumLN + peek.lnCount)) break;
+
+                extendEnd = nextEnd;
+                extendNoteEnd = peek.noteEndIdx;
+                accumRC += peek.riceCount;
+                accumLN += peek.lnCount;
+                scanIndex = peek.nextIndex;
+            }
+
+            WindowList1.push([block.noteStartIdx, extendNoteEnd]);
+            blockStart = extendEnd;
+        } else {
+            // 弱区块：窥视下一个区块，如果 LN 时长覆盖 >25% → 扩展1个单位
+            const nextStart = blockEnd;
+            const nextEnd = nextStart + getBlockLength(nextStart);
+            const peek = countNotesInRange(nextStart, nextEnd, scanIndex);
+
+            if (peek.noteStartIdx !== -1 && isLNDurationValid(peek.noteStartIdx, peek.noteEndIdx, nextStart, nextEnd, 0.25)) {
+                WindowList1.push([block.noteStartIdx, peek.noteEndIdx]);
+                scanIndex = peek.nextIndex;
+                blockStart = nextEnd;
+            } else {
+                scanIndex = peek.nextIndex;
+                blockStart = nextEnd;
+            }
+        }
     }
 
     if (WindowList1.length === 0) return WindowList1;
 
     // 第二步：合并区间
     let WindowList2 = new Array();
-    windowStartIndex = -1;
-    windowEndIndex = -1;
+    let windowStartIndex = -1;
+    let windowEndIndex = -1;
     for (let i = 0; i < WindowList1.length; i++) {
         if (windowStartIndex !== -1) {
-            if (WindowList1[i][0] <= windowEndIndex) {
+            if (WindowList1[i][0] <= windowEndIndex + 1) {
                 windowEndIndex = WindowList1[i][1];
-            } // 合并重合区间
-            else {
+            } else {
                 WindowList2.push([windowStartIndex, windowEndIndex]);
                 windowStartIndex = -1;
             }
         }
-        // 不要合并上下两个if，windowStartIndex被修改了
         if (windowStartIndex === -1) {
             windowStartIndex = WindowList1[i][0];
             windowEndIndex = WindowList1[i][1];
         }
-
         if (i + 1 >= WindowList1.length && windowStartIndex !== -1) {
-            WindowList2.push([windowStartIndex, windowEndIndex]); // 收尾
-            break;
+            WindowList2.push([windowStartIndex, windowEndIndex]);
         }
     }
     WindowList1 = null;
 
-    // 第三步：剔除米部分，目前剔除了最早的LN
+    // 第三步：剔除米部分 — 对每个窗口独立处理
     let WindowList3 = new Array();
-    windowStartIndex = -1;
-    windowEndIndex = -1;
-    let currentStartIndex = -1; // 等效于与当前note同一时间的最左边的note的index
-    currentTime = NaN;
-    let windowEndTime = -1e308;
-    j = 0; // WindowList2的index
-    for (let i = WindowList2[0][0]; i < p.columns.length; i += 1) {
-        if (p.noteStarts[i] !== currentTime) {
-            currentTime = p.noteStarts[i];
-            currentStartIndex = i;
-        }
-        if (i < WindowList2[j][0]) continue;
+    for (let w = 0; w < WindowList2.length; w++) {
+        const wStart = WindowList2[w][0];
+        const wEnd = WindowList2[w][1];
+        let windowStartIndex = -1;
+        let windowEndIndex = -1;
+        let currentStartIndex = -1;
+        let curTime = NaN;
+        let windowEndTime = -1e308;
 
-        if ((p.noteTypes[i] & 128) !== 0) {
-            if (windowStartIndex === -1) windowStartIndex = currentStartIndex;
-            windowEndTime = Math.max(windowEndTime, p.noteEnds[i]);
-            windowEndIndex = i;
-        }
-        else if (p.noteStarts[i] >= windowEndTime) {
-            windowEndIndex = i;
-        }
+        for (let i = wStart; i <= wEnd; i++) {
+            if (p.noteStarts[i] !== curTime) {
+                curTime = p.noteStarts[i];
+                currentStartIndex = i;
+            }
 
-        if (i >= WindowList2[j][1]) {
-            j++;
+            if ((p.noteTypes[i] & 128) !== 0) {
+                if (windowStartIndex === -1) windowStartIndex = currentStartIndex;
+                windowEndTime = Math.max(windowEndTime, p.noteEnds[i]);
+                windowEndIndex = i;
+            }
+            else if (p.noteStarts[i] >= windowEndTime) {
+                windowEndIndex = i;
+            }
+        }
+        if (windowStartIndex !== -1) {
             WindowList3.push([windowStartIndex, windowEndIndex]);
-            windowStartIndex = -1;
-            windowEndIndex = -1;
-            windowEndTime = -1e308;
-            if (j >= WindowList2.length) break;
         }
     }
 
