@@ -1,5 +1,5 @@
 import { runSunnyEstimatorFromText } from "../estimator/sunnyEstimator.js";
-//import { runSunnyWindowEstimatorFromText } from "../estimator/sunnyWindowEstimator.js"
+import { runSunnyWindowEstimatorFromText } from "../estimator/sunnyWindowEstimator.js"
 import { runDanielEstimatorFromText } from "../estimator/danielEstimator.js";
 import { runAzusaEstimatorFromText } from "../estimator/azusaEstimator.js";
 import { runRoxyEstimatorFromText } from "../estimator/roxyEstimator.js";

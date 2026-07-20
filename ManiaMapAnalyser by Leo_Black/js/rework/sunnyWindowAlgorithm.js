@@ -891,7 +891,7 @@ function smoothDForGraph(allCorners, DAll, noteSeq) {
     return Array.from(interpValues(allCorners, uniformTimes, smoothed));
 }
 
-const MIN_WINDOW_LENGTH = 10*1000; // 10s
+const MIN_WINDOW_LENGTH = 30*1000; // 30s
 const MIN_LN_PERCENTAGE = 20; // 20%
 const MIN_LN_DENSITY = MIN_LN_PERCENTAGE * 0.01;
 
