@@ -116,6 +116,7 @@ export function estDiff2(sr, srLN, columnCount) {
 
     const lnTable = keys.LN[Object.keys(keys.LN)[0]] ?? keys.LN.default;
     const lnDiff = intervalLookup(srLN, lnTable, "Unknown LN difficulty");
+    if (srLN < table[0][0]) return `${rcDiff} || ${lnDiff} (${Math.round(srLN*100)/100}*)`;
     return `${rcDiff} || ${lnDiff}`;
 }
 
