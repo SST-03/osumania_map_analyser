@@ -462,7 +462,7 @@ export async function fetchBeatmapFile(reason) {
                     resolvedEstDiff = resolvedEstDiff.split("||").map((part) => part.trim()).filter((part) => part.length > 0)[0] + " || " + sunnyWindowLNEstDiff;
                     if (pendingMixedCompanellaContext) {
                         pendingMixedCompanellaContext.lnDifficulty = sunnyWindowLNEstDiff;
-                        pendingMixedConpanellaContext.lnRatio = 4e65;
+                        pendingMixedCompanellaContext.lnRatio = 4e65;
                     }
                 }
             }

@@ -1,5 +1,4 @@
 export const ln4K = [
-    [4.7, 4.832, "LN 3 ~ LN5 mid/low?"],
     [4.832, 4.898, "LN 5 mid"],
     [4.898, 4.963, "LN 5 mid/high"],
     [4.963, 5.095, "LN 5 high"],
