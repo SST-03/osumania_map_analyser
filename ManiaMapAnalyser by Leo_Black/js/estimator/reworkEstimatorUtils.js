@@ -96,7 +96,6 @@ function intervalLookup(sr, table, fallbackLabel) {
 
 function lnSrInRange(sr, columnCount) {
     const list = state.lnStarShowGroups;
-    console.error(list)
     for (var i = 0; i < list.length; i++) {
         const value = list[i]
         if (value.whitelist.indexOf(columnCount) >= 0 && sr >= value.min && sr <= value.max) return true;

@@ -236,7 +236,6 @@ export function normalizeLNStarShowGroup(list) {
             max: value.max === "" ? 999 : Number(value.max),
             whitelist: whitelist
         });
-        console.error(array)
     }
     return array;
 }
