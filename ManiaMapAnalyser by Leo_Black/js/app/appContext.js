@@ -135,7 +135,8 @@ export const state = {
     settingsReceivedFromCommand: false,
     initialSettingsResolver: null,
     analysisRequestSeq: 0,
-    wsEndpoint: APP_CONFIG.defaults.wsEndpoint || SOCKET_HOST
+    wsEndpoint: APP_CONFIG.defaults.wsEndpoint || SOCKET_HOST,
+    lnStarShowGroups: APP_CONFIG.defaults.lnStarShowGroups,
 };
 
 export const MODE_TAG_OPTIONS = APP_CONFIG.options.modeTag;
@@ -205,6 +206,7 @@ export const {
     parseSvDetectionValue,
     parseWsEndpointValue,
     parseForceSunnyWindowValue,
+    parseLNStarShowGroupValue,
 } = createSettingsParsers(APP_CONFIG);
 
 export function getActiveContentBar() {

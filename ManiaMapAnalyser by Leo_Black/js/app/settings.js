@@ -37,6 +37,7 @@ import {
     parseVibroDetectionValue,
     parseWsEndpointValue,
     parseForceSunnyWindowValue,
+    parseLNStarShowGroupValue,
     patternClustersEl,
     reworkStarEl,
     socket,
@@ -55,6 +56,7 @@ import {
     normalizeEstimatorAlgorithmValue,
     normalizeWsEndpointValue,
     normalizeSrTextValue,
+    normalizeLNStarShowGroup,
 } from "../parser/settingsParser.js";
 import {
     clearDiffGraph,
@@ -346,6 +348,13 @@ export function applyForceSunnyWindowSetting(value) {
     const next = normalizeBooleanSetting(value, APP_CONFIG.defaults.forceSunnyWindow);
     const changed = state.forceSunnyWindow !== next;
     state.forceSunnyWindow = next;
+    return changed;
+}
+
+export function applyLNStarShowGroupSetting(value) {
+    const next = normalizeLNStarShowGroup(value, APP_CONFIG.defaults.lnStarShowGroups);
+    const changed = state.lnStarShowGroups !== next;
+    state.lnStarShowGroups = next;
     return changed;
 }
 
@@ -705,6 +714,7 @@ export function setupSettingsCommandListener() {
         const floatingTrianglesChanged = applyIf("enableFloatingTriangles", applyEnableFloatingTrianglesSetting, parseEnableFloatingTrianglesValue(payload));
         const coverArtChanged = applyIf("enableCoverArt", applyEnableCoverArtSetting, parseEnableCoverArtValue(payload));
         const customColorChanged = applyIf("customBackgroundColor", applyCustomBackgroundColorSetting, parseCustomBackgroundColorValue(payload));
+        const lnStarShowGroupsChanged = applyIf("lnStarShowGroups",  applyLNStarShowGroupSetting, parseLNStarShowGroupValue(payload));
 
         const legacyAutoMode = parseAutoModeValue(payload);
         if (legacyAutoMode && !isAutoDisplayEnabled()) {
@@ -740,7 +750,9 @@ export function setupSettingsCommandListener() {
             || floatingTrianglesChanged
             || coverArtChanged
             || customColorChanged
-            || svChanged;
+            || svChanged
+            || forceSunnyWindowChanged
+            || lnStarShowGroupsChanged;
 
         const recomputeNeeded = contentBarChanged
             || srTextChanged
@@ -755,7 +767,9 @@ export function setupSettingsCommandListener() {
             || rainbowChanged
             || vibroChanged
             || modeTagVisibilityChanged
-            || svChanged;
+            || svChanged
+            || forceSunnyWindowChanged
+            || lnStarShowGroupsChanged;
 
         if (typeof state.initialSettingsResolver === "function") {
             const resolve = state.initialSettingsResolver;
@@ -842,6 +856,7 @@ export async function loadSettings() {
         applyCustomBackgroundColorSetting(parseCustomBackgroundColorValue(source));
         applyUseSvDetectionSetting(parseSvDetectionValue(source));
         applyForceSunnyWindowSetting(parseForceSunnyWindowValue(source));
+        applyLNStarShowGroupSetting(parseLNStarShowGroupValue(source))
     }
 
     // Apply file settings as baseline immediately
@@ -879,6 +894,7 @@ export async function loadSettings() {
             customBackgroundColor: APP_CONFIG.defaults.customBackgroundColor,
             useSvDetection: APP_CONFIG.defaults.useSvDetection,
             forceSunnyWindow: APP_CONFIG.defaults.forceSunnyWindow,
+            lnStarShowGroups: APP_CONFIG.defaults.lnStarShowGroups,
         });
     }
 

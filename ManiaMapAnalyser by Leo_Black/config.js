@@ -106,6 +106,7 @@ export const APP_CONFIG = {
         diffText: "Difficulty",
         debugUseAmount: false,
         forceSunnyWindow: false,
+        lnStarShowGroups: [],
     },
 
     mods: {
