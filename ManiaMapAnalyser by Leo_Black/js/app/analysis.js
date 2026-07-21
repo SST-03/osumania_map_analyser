@@ -363,6 +363,7 @@ export async function fetchBeatmapFile(reason) {
         const shouldReportEtternaError = showsEtterna
             || needMsdValue
             || estimatorNeedsCompanellaData;
+        const shouldForceSunnyWindow = state.forceSunnyWindow;
 
         try {
             const estimatorOptions = {
@@ -452,6 +453,19 @@ export async function fetchBeatmapFile(reason) {
             resolvedEstDiff = nextEstDiff;
             resolvedNumericDifficulty = nextNumericDifficulty;
             resolvedNumericDifficultyHint = nextNumericDifficultyHint;
+
+            // 如果强制使用SunnyWindow，在这里替换LN部分
+            if (shouldForceSunnyWindow) {
+                const sunnyWindowRework = runSunnyWindowEstimatorFromText(rawText, estimatorOptions);
+                const sunnyWindowLNEstDiff = sunnyWindowRework.estDiff.split("||").map((part) => part.trim()).filter((part) => part.length > 0)[1];
+                if (sunnyWindowLNEstDiff) {
+                    resolvedEstDiff = resolvedEstDiff.split("||").map((part) => part.trim()).filter((part) => part.length > 0)[0] + " || " + sunnyWindowLNEstDiff;
+                    if (pendingMixedCompanellaContext) {
+                        pendingMixedCompanellaContext.lnDifficulty = sunnyWindowLNEstDiff;
+                        pendingMixedConpanellaContext.lnRatio = 4e65;
+                    }
+                }
+            }
             updateDiffTextVisibility();
 
             if (state.diffText === "Graph" || showsGraph) {

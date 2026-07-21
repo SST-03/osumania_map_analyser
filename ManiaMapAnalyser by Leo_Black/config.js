@@ -105,6 +105,7 @@ export const APP_CONFIG = {
         srText: "ReworkSR",
         diffText: "Difficulty",
         debugUseAmount: false,
+        forceSunnyWindow: false,
     },
 
     mods: {

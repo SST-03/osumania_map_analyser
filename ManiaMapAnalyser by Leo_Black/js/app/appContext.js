@@ -101,6 +101,7 @@ export const state = {
     enableCoverArt: APP_CONFIG.defaults.enableCoverArt,
     customBackgroundColor: APP_CONFIG.defaults.customBackgroundColor,
     vibroDetection: APP_CONFIG.defaults.vibroDetection,
+    forceSunnyWindow: APP_CONFIG.defaults.forceSunnyWindow,
     numericDifficulty: null,
     numericDifficultyHint: null,
     forceHideNumericDifficulty: false,
@@ -203,6 +204,7 @@ export const {
     parseCustomBackgroundColorValue,
     parseSvDetectionValue,
     parseWsEndpointValue,
+    parseForceSunnyWindowValue,
 } = createSettingsParsers(APP_CONFIG);
 
 export function getActiveContentBar() {

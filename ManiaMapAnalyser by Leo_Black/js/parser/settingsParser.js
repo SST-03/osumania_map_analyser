@@ -537,6 +537,11 @@ export function createSettingsParsers(appConfig) {
         return normalizeWsEndpointValue(fallbackHost, "localhost:24050");
     }
 
+    function parseForceSunnyWindowValue(settingsPayload) {
+        const value = extractSettingValue(settingsPayload, "forceSunnyWindow");
+        return normalizeBooleanSetting(value, appConfig.defaults.forceSunnyWindow);
+    }
+
     return {
         parseEnablePatternValue,
         parseContentBarValue,
@@ -570,5 +575,6 @@ export function createSettingsParsers(appConfig) {
         parseUseOsuFontValue,
         parseSvDetectionValue,
         parseWsEndpointValue,
+        parseForceSunnyWindowValue,
     };
 }

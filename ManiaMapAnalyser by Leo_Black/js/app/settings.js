@@ -36,6 +36,7 @@ import {
     parseSvDetectionValue,
     parseVibroDetectionValue,
     parseWsEndpointValue,
+    parseForceSunnyWindowValue,
     patternClustersEl,
     reworkStarEl,
     socket,
@@ -338,6 +339,13 @@ export function applyWsEndpointSetting(value) {
         socket.setHost(next, true);
     }
 
+    return changed;
+}
+
+export function applyForceSunnyWindowSetting(value) {
+    const next = normalizeBooleanSetting(value, APP_CONFIG.defaults.forceSunnyWindow);
+    const changed = state.forceSunnyWindow !== next;
+    state.forceSunnyWindow = next;
     return changed;
 }
 
@@ -692,6 +700,7 @@ export function setupSettingsCommandListener() {
         const reverseCardDirectionChanged = applyIf("reverseCardExtendDirection", applyReverseCardExtendDirectionSetting, parseReverseCardExtendDirectionValue(payload));
         const osuFontChanged = applyIf("useOsuFont", applyUseOsuFontSetting, parseUseOsuFontValue(payload));
         const svChanged = applyIf("useSvDetection", applyUseSvDetectionSetting, parseSvDetectionValue(payload));
+        const forceSunnyWindowChanged = applyIf("forceSunnyWindow", applyForceSunnyWindowSetting, parseForceSunnyWindowValue(payload));
         const osuThemeChanged = applyIf("enableOsuTheme", applyEnableOsuThemeSetting, parseEnableOsuThemeValue(payload));
         const floatingTrianglesChanged = applyIf("enableFloatingTriangles", applyEnableFloatingTrianglesSetting, parseEnableFloatingTrianglesValue(payload));
         const coverArtChanged = applyIf("enableCoverArt", applyEnableCoverArtSetting, parseEnableCoverArtValue(payload));
@@ -832,6 +841,7 @@ export async function loadSettings() {
         applyEnableCoverArtSetting(parseEnableCoverArtValue(source));
         applyCustomBackgroundColorSetting(parseCustomBackgroundColorValue(source));
         applyUseSvDetectionSetting(parseSvDetectionValue(source));
+        applyForceSunnyWindowSetting(parseForceSunnyWindowValue(source));
     }
 
     // Apply file settings as baseline immediately
@@ -868,6 +878,7 @@ export async function loadSettings() {
             enableCoverArt: APP_CONFIG.defaults.enableCoverArt,
             customBackgroundColor: APP_CONFIG.defaults.customBackgroundColor,
             useSvDetection: APP_CONFIG.defaults.useSvDetection,
+            forceSunnyWindow: APP_CONFIG.defaults.forceSunnyWindow,
         });
     }
 

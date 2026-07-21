@@ -331,6 +331,14 @@
 		"value": "0.74.0"
 	},
 	{
+		"uniqueID": "forceSunnyWindow",
+		"type": "checkbox",
+		"title": "Force Using SunnyWindow",
+		"description": "Force to use SunnyWindow to calculate LN difficulty.",
+		"options": [],
+		"value": true
+	},
+	{
 		"uniqueID": "hNetwork",
 		"type": "header",
 		"title": "Network Configuration",
