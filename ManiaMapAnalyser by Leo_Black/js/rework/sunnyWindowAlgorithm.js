@@ -1171,40 +1171,8 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
         }
     }
     WindowList1 = null;
-
-    // 第三步：剔除米部分 — 对每个窗口独立处理
-    let WindowList3 = new Array();
-    for (let w = 0; w < WindowList2.length; w++) {
-        const wStart = WindowList2[w][0];
-        const wEnd = WindowList2[w][1];
-        let windowStartIndex = -1;
-        let windowEndIndex = -1;
-        let currentStartIndex = -1;
-        let curTime = NaN;
-        let windowEndTime = -1e308;
-
-        for (let i = wStart; i <= wEnd; i++) {
-            if (p.noteStarts[i] !== curTime) {
-                curTime = p.noteStarts[i];
-                currentStartIndex = i;
-            }
-
-            if ((p.noteTypes[i] & 128) !== 0) {
-                if (windowStartIndex === -1) windowStartIndex = currentStartIndex;
-                windowEndTime = Math.max(windowEndTime, p.noteEnds[i]);
-                windowEndIndex = i;
-            }
-            else if (p.noteStarts[i] >= windowEndTime) {
-                windowEndIndex = i;
-            }
-        }
-        if (windowStartIndex !== -1) {
-            WindowList3.push([windowStartIndex, windowEndIndex]);
-        }
-    }
-
-    WindowList2 = null;
-    return WindowList3;
+    // getCuttedNoteSeq做过一次删米了
+    return WindowList2;
 }
     
 function getCuttedNoteSeq(p, noteSeq_Temp) {
