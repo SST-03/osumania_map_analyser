@@ -198,13 +198,12 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
     const pObj = new OsuFileParser(osuText);
     pObj.process();
     let p = pObj.getParsedData();
-    let lnRatio = p.lnRatio;
+    let lnRatio;
 
     if (cvtFlag) {
     if (String(cvtFlag).includes("IN")) {
             try {
         pObj.modIN();
-        lnRatio = pObj.getLNRatio();
             } catch {
         // keep original on convert error
             }
@@ -212,7 +211,6 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
     if (String(cvtFlag).includes("HO")) {
             try {
         pObj.modHO();
-        lnRatio = pObj.getLNRatio();
             } catch {
         // keep original on convert error
             }
@@ -255,6 +253,21 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
             lnRatio,
             columnCount,
     };
+    }
+    if (lnRatio <= 0) {
+        return {
+            status: "NoLN",
+            x: 0,
+            K: 0,
+            T: 0,
+            noteSeq: [],
+            noteSeqByColumn: [],
+            lnSeq: [],
+            tailSeq: [],
+            lnSeqByColumn: [],
+            lnRatio,
+            columnCount,
+        };
     }
 
     let od = 0;
@@ -1006,13 +1019,12 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
     const pObj = new OsuFileParser(osuText);
     pObj.process();
     let p = pObj.getParsedData();
-    let lnRatio = p.lnRatio;
+    let lnRatio;
 
     if (cvtFlag) {
     if (String(cvtFlag).includes("IN")) {
             try {
         pObj.modIN();
-        lnRatio = pObj.getLNRatio();
             } catch {
         // keep original on convert error
             }
@@ -1020,7 +1032,6 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
     if (String(cvtFlag).includes("HO")) {
             try {
         pObj.modHO();
-        lnRatio = pObj.getLNRatio();
             } catch {
         // keep original on convert error
             }
@@ -1034,7 +1045,7 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
 
     const columnCount = pObj.getColumnCount();
 
-    if (p.status === "Fail" || p.status === "NotMania") return new Array();
+    if (p.status === "Fail" || p.status === "NotMania" || lnRatio <= 0) return new Array();
 
     const speedRate = _speedRate !== 0 ? _speedRate : 1;
 
