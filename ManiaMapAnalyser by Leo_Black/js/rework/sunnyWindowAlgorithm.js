@@ -286,8 +286,9 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
             columnCount,
         };
     }
-    const noteSeq = [];
 
+    // 第一步：存储正常剪完的note
+    const noteSeq_Temp = [];
     for (let LNPartsIndex = 0; LNPartsIndex < LNParts.length; LNPartsIndex++){
     for (let i = LNParts[LNPartsIndex][0]; i <= LNParts[LNPartsIndex][1]; i += 1) {
         const k = p.columns[i];
@@ -297,8 +298,25 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
         h = Math.floor(h * timeScale);
         t = t >= 0 ? Math.floor(t * timeScale) : t;
 
-        noteSeq.push([k, h, t]);
+        noteSeq_Temp.push([k, h, t]);
     }
+    }
+
+    const noteSeq = getCuttedNoteSeq(p, noteSeq_Temp);
+    if (noteSeq.length <= 0) {
+        return {
+            status: "NoLN",
+            x: 0,
+            K: 0,
+            T: 0,
+            noteSeq: [],
+            noteSeqByColumn: [],
+            lnSeq: [],
+            tailSeq: [],
+            lnSeqByColumn: [],
+            lnRatio,
+            columnCount,
+        };
     }
 
     let x = 0.3 * Math.sqrt((64.5 - Math.ceil(od * 3)) / 500);
@@ -1187,6 +1205,44 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
 
     WindowList2 = null;
     return WindowList3;
+}
+    
+function getCuttedNoteSeq(p, noteSeq_Temp) {
+    // 截取有LN覆盖的时间（当前版本不考虑单手情况，改成只有单手也简单）
+    const LNTimes = [];
+    
+    // 第一步：框出所有区间
+    let currentTime = undefined;
+    let LNStartTime = -1e300;
+    let LNEndTime = -1e300;
+    let LNRangeList = new Array();
+
+    for (const [, start, end] of noteSeq_Temp) {
+        if (start !== currentTime) {
+            if (LNStartTime !== -1e300 && LNEndTime < start) {
+                LNRangeList.push([LNStartTime, LNEndTime]);
+                LNStartTime = -1e300;
+                LNEndTime = -1e300;
+            }
+            currentTime = start;
+        }
+        if (end !== -1) { //是LN
+            if (LNStartTime === -1e300) LNStartTime = start;
+            LNEndTime = Math.max(LNEndTime, end);
+        }
+    }
+    if (LNStartTime !== -1e300) LNRangeList.push([LNStartTime, LNEndTime]); // 防止LN结尾
+    if (LNRangeList.length <= 0) return [];
+
+    // 第二步：返回
+    let i = 0;
+    const noteSeq = [];
+    for (const [k, start, end] of noteSeq_Temp) {
+        if (start > LNRangeList[i][1]) i++; // 显而易见的一个note不会连续跳过两个窗口
+        if (i >= LNRangeList.length) break;
+        if (start >= LNRangeList[i][0]) noteSeq.push([k, start, end]);
+    }
+    return noteSeq;
 }
 
 export function calculateLN(osuText, speedRate = 1.0, odFlag = null, cvtFlag = null, options = {}) {
