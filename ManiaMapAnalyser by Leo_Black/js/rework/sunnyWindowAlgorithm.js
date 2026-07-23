@@ -237,6 +237,7 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
             lnSeqByColumn: [],
             lnRatio,
             columnCount,
+            typePercentageData: null,
     };
     }
     if (p.status === "NotMania") {
@@ -252,8 +253,15 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
             lnSeqByColumn: [],
             lnRatio,
             columnCount,
+            typePercentageData: null,
     };
     }
+
+    // TODO 后面还要补上typePercentageData
+    function calcMixedPercentage (p) {
+
+    }
+
     if (lnRatio <= 0) {
         return {
             status: "NoLN",
@@ -993,25 +1001,26 @@ function getUnitLength(timings, timeMs) {
  * 返回 LN 占据的总毫秒数（合并重叠区间，不重复计算）。
  */
 function computeLNDuration(p, timeStart, timeEnd, noteStartIdx, noteEndIdx) {
-    const intervals = [];
+    let merged = 0;
+    let curStart = -1e300, curEnd = -1e300;
     for (let k = noteStartIdx; k <= noteEndIdx; k++) {
         if (p.noteStarts[k] >= timeEnd) break;
         if ((p.noteTypes[k] & 128) !== 0) {
-            const s = Math.max(p.noteStarts[k], timeStart);
-            const e = Math.min(p.noteEnds[k], timeEnd);
-            if (e > s) intervals.push([s, e]);
+            if (curStart !== -1e300 && p.noteStarts[k] > curEnd) {
+                merged += (curEnd - curStart);
+                curStart = -1e300;
+                curEnd = -1e300;
+            }
+            if (curStart === -1e300) {
+                curStart = p.noteStarts[k];
+                curEnd = p.noteEnds[k];
+            }
+            else {
+                curEnd = Math.max(curEnd, p.noteEnds[k]);
+            }
         }
     }
-    // 合并重叠区间
-    intervals.sort((a, b) => a[0] - b[0]);
-    let merged = 0;
-    let curStart = -1, curEnd = -1;
-    for (const [s, e] of intervals) {
-        if (curStart === -1) { curStart = s; curEnd = e; }
-        else if (s <= curEnd) { curEnd = Math.max(curEnd, e); }
-        else { merged += curEnd - curStart; curStart = s; curEnd = e; }
-    }
-    if (curStart !== -1) merged += curEnd - curStart;
+    if (curStart !== -1e300) merged += (curEnd - curStart);
     return merged;
 }
 
@@ -1226,6 +1235,7 @@ function getCuttedNoteSeq(p, noteSeq_Temp) {
 
 export function calculateLN(osuText, speedRate = 1.0, odFlag = null, cvtFlag = null, options = {}) {
     const withGraph = options?.withGraph === true;
+    const shouldCalcTypePercentage = true; // 记得改成选项
 
     const {
     status,
@@ -1238,11 +1248,15 @@ export function calculateLN(osuText, speedRate = 1.0, odFlag = null, cvtFlag = n
     tailSeq,
     lnRatio,
     columnCount,
+    typePercentageData,
     } = preprocessFile(osuText, speedRate, odFlag, cvtFlag);
 
     if (status === "Fail") return -1;
     if (status === "NotMania") return -2;
-    if (status === "NoLN") return -3;
+    if (status === "NoLN") {
+        if (!shouldCalcTypePercentage) return -3;
+        return {NoLN: true, typePercentageData: typePercentageData}
+    }
     if (!noteSeq.length || K <= 0) return -1;
 
     const { allCorners, baseCorners, ACorners } = getCorners(T, noteSeq);
@@ -1340,19 +1354,20 @@ export function calculateLN(osuText, speedRate = 1.0, odFlag = null, cvtFlag = n
     sr = rescaleHigh(sr);
     sr *= 0.975;
 
+    const ret = {
+        star: sr,
+        lnRatio,
+        columnCount,
+        typePercentageData
+    }
     if (withGraph) {
-    const DPre = applyProximityEnvelope(allCorners, DAll, noteSeq);
-    const DGraph = smoothDForGraph(allCorners, DPre, noteSeq);
-    return {
-            star: sr,
-            lnRatio,
-            columnCount,
-            graph: {
-        times: Array.from(allCorners),
-        values: DGraph,
-            },
-    };
+        const DPre = applyProximityEnvelope(allCorners, DAll, noteSeq);
+        const DGraph = smoothDForGraph(allCorners, DPre, noteSeq);
+        ret.graph = {
+            times: Array.from(allCorners),
+            values: DGraph,
+        };
     }
 
-    return [sr, lnRatio, columnCount];
+    return ret;
 }

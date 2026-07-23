@@ -429,7 +429,7 @@ export async function fetchBeatmapFile(reason) {
                 nextNumericDifficulty = selectedRework.numericDifficulty;
                 nextNumericDifficultyHint = selectedRework.numericDifficultyHint;
                 pendingMixedCompanellaContext = selectedRework.mixedCompanellaPlan || null;
-            } else if (estimatorAlgorithm === "Sunnywindow") {
+            } else if (estimatorAlgorithm === "SunnyWindow") {
                 selectedRework = runSunnyWindowEstimatorFromText(rawText, estimatorOptions);
                 nextEstDiff = selectedRework.estDiff;
                 nextNumericDifficulty = selectedRework.numericDifficulty;
@@ -455,7 +455,7 @@ export async function fetchBeatmapFile(reason) {
             resolvedNumericDifficultyHint = nextNumericDifficultyHint;
 
             // 如果强制使用SunnyWindow，在这里替换LN部分
-            if (shouldForceSunnyWindow) {
+            if (shouldForceSunnyWindow && actualEstimatorAlgorithm != "SunnyWindow") {
                 const sunnyWindowRework = runSunnyWindowEstimatorFromText(rawText, estimatorOptions);
                 const sunnyWindowLNEstDiff = sunnyWindowRework.estDiff.split("||").map((part) => part.trim()).filter((part) => part.length > 0)[1];
                 if (sunnyWindowLNEstDiff) {
