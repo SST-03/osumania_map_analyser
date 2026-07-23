@@ -979,7 +979,7 @@ function smoothDForGraph(allCorners, DAll, noteSeq) {
 
 const MIN_LN_PERCENTAGE = 20; // 20%
 const MIN_LN_DENSITY = MIN_LN_PERCENTAGE * 0.01;
-const TYPELN_MIN_LN_DENSITY = 90 * 0.01; // 90%
+const TYPELN_MIN_LN_DENSITY = 100 * 0.01; // 90%
 
 /**
  * 解析 .osu 文本中的 timing points。
@@ -1119,7 +1119,7 @@ function getLNParts(pureLN, osuText, _speedRate, odFlag, cvtFlag) {
     // 判断 LN 占比是否达到阈值（基于音符数量）
     function isLNPercentageValid(riceCount, LNCount, MinLnDensity) {
         if (riceCount + LNCount === 0) return false;
-        return (LNCount / (riceCount + LNCount)) > MinLnDensity;
+        return (LNCount / (riceCount + LNCount)) >= MinLnDensity;
     }
 
     /**
