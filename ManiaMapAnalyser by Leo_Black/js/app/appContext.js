@@ -53,7 +53,7 @@ export const overlayMessageEl = document.getElementById("overlay-message");
 export const mainCardEl = document.querySelector(".main-card");
 export const dashboardEl = document.querySelector(".dashboard");
 export const titleIconEl = document.querySelector(".title-icon");
-export const modeTagEl = document.getElementById("mode-tag");
+export const modeTagSubGroupEl = document.getElementById("mode-tag-subgroup");
 export const svTagEl = document.getElementById("sv-tag");
 export const starTipEl = document.getElementById("star-tip");
 

@@ -3,9 +3,10 @@ import { calculateLN } from "../rework/sunnyWindowAlgorithm.js"
 import { estDiff2, normalizeReworkResult } from "./reworkEstimatorUtils.js";
 
 function normalizeSunnyWindowResult(result) {
-    if (result === -3) return {star: 0};
-    else if (typeof result === "object" && result?.NoLN) return {star: 0, }
-    return normalizeReworkResult(result);
+    if (result?.NoLN) return {star: 0, typePercentageData: result.typePercentageData};
+    const ret = normalizeReworkResult(result);
+    ret.typePercentageData = result.typePercentageData;
+    return ret;
 }
 
 export function runSunnyWindowEstimatorFromText(osuText, options = {}) {
@@ -25,5 +26,6 @@ export function runSunnyWindowEstimatorFromText(osuText, options = {}) {
         estDiff: estDiff2(parsed.star, parsedLN.star, parsed.columnCount),
         numericDifficulty: null,
         numericDifficultyHint: null,
+        typePercentageData: parsedLN.typePercentageData,
     };
 }

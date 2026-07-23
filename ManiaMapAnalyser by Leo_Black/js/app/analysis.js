@@ -338,6 +338,7 @@ export async function fetchBeatmapFile(reason) {
         let resolvedNumericDifficulty = null;
         let resolvedNumericDifficultyHint = null;
         let resolvedMetaHtml = "LN%: -<br/>Keys: -";
+        let typePercentageData = null;
         let pendingCompanellaEstimate = false;
         let pendingMixedCompanellaContext = null;
 
@@ -434,6 +435,7 @@ export async function fetchBeatmapFile(reason) {
                 nextEstDiff = selectedRework.estDiff;
                 nextNumericDifficulty = selectedRework.numericDifficulty;
                 nextNumericDifficultyHint = selectedRework.numericDifficultyHint;
+                typePercentageData = selectedRework.typePercentageData;
             } else {
                 const wp = runInWorker(rawText, { ...estimatorOptions, estimatorAlgorithm: "Sunny" });
                 selectedRework = wp ? await wp : runSunnyEstimatorFromText(rawText, estimatorOptions);
@@ -458,6 +460,7 @@ export async function fetchBeatmapFile(reason) {
             if (shouldForceSunnyWindow && actualEstimatorAlgorithm != "SunnyWindow") {
                 const sunnyWindowRework = runSunnyWindowEstimatorFromText(rawText, estimatorOptions);
                 const sunnyWindowLNEstDiff = sunnyWindowRework.estDiff.split("||").map((part) => part.trim()).filter((part) => part.length > 0)[1];
+                typePercentageData = sunnyWindowRework.typePercentageData;
                 if (sunnyWindowLNEstDiff) {
                     resolvedEstDiff = resolvedEstDiff.split("||").map((part) => part.trim()).filter((part) => part.length > 0)[0] + " || " + sunnyWindowLNEstDiff;
                     if (pendingMixedCompanellaContext) {
@@ -652,7 +655,7 @@ export async function fetchBeatmapFile(reason) {
             }
         }
 
-        setModeTag(resolvedModeTag);
+        setModeTag(typePercentageData ?? resolvedModeTag);
         setSvTagVisible(shouldShowSvTag);
 
         if (rework) {

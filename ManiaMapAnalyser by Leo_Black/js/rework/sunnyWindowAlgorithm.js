@@ -257,11 +257,6 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
     };
     }
 
-    // TODO 后面还要补上typePercentageData
-    function calcMixedPercentage (p) {
-
-    }
-
     if (lnRatio <= 0) {
         return {
             status: "NoLN",
@@ -275,6 +270,7 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
             lnSeqByColumn: [],
             lnRatio,
             columnCount,
+            typePercentageData: null,
         };
     }
 
@@ -291,7 +287,52 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
 
     const timeScale = speedRate !== 0 ? 1 / speedRate : 1;
 
-    const LNParts = getLNParts(osuText, speedRate, odFlag, cvtFlag);
+    function calcTypeMixLength (p) {
+        const noteSeq = [];
+        for (let i = 0; i < p.columns.length; i += 1) {
+            const k = p.columns[i];
+            let h = p.noteStarts[i];
+            let t = (p.noteTypes[i] & 128) !== 0 ? p.noteEnds[i] : -1;
+            h = Math.floor(h * timeScale);
+            t = t >= 0 ? Math.floor(t * timeScale) : t;
+            noteSeq.push([k, h, t]);
+        }
+        return getCuttedNoteSeq(noteSeq).length;
+    }
+
+    // TODO:允许禁用；优化
+    function getTypePercentageData(p, HB_NoteSeq, osuText, speedRate, odFlag, cvtFlag) {
+        function getFullLength(count, value) {return count + (value[1] - value[0] + 1);}
+
+        const Mix_Length = calcTypeMixLength (p);
+        const HB_Length = HB_NoteSeq.length;
+        const LNParts = getLNParts(true, osuText, speedRate, odFlag, cvtFlag);
+        const LN_NoteSeq = []
+        for (let LNPartsIndex = 0; LNPartsIndex < LNParts.length; LNPartsIndex++){
+        for (let i = LNParts[LNPartsIndex][0]; i <= LNParts[LNPartsIndex][1]; i += 1) {
+            const k = p.columns[i];
+            let h = p.noteStarts[i];
+            let t = (p.noteTypes[i] & 128) !== 0 ? p.noteEnds[i] : -1;
+            h = Math.floor(h * timeScale);
+            t = t >= 0 ? Math.floor(t * timeScale) : t;
+            LN_NoteSeq.push([k, h, t]);
+        }
+        }
+        const LN_Length = getCuttedNoteSeq(LN_NoteSeq).length
+
+        console.error(p.columns.length, Mix_Length, HB_Length, LN_Length);
+        return [
+            ["All", p.columns.length],
+            ["RC", p.columns.length - Mix_Length],
+            ["Mix", Mix_Length - HB_Length],
+            ["HB", HB_Length - LN_Length],
+            ["LN", LN_Length],
+        ]
+    }
+
+    const LNParts = getLNParts(false, osuText, speedRate, odFlag, cvtFlag);
+
+    const shouldCalcData = true; // TODO 写出选项
     if (LNParts.length <= 0) {
         return {
             status: "NoLN",
@@ -305,6 +346,7 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
             lnSeqByColumn: [],
             lnRatio,
             columnCount,
+            typePercentageData : shouldCalcData ? getTypePercentageData(p, [], osuText, speedRate, odFlag, cvtFlag) : null,
         };
     }
 
@@ -323,7 +365,9 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
     }
     }
 
-    const noteSeq = getCuttedNoteSeq(p, noteSeq_Temp);
+    const noteSeq = getCuttedNoteSeq(noteSeq_Temp);
+
+    const typePercentageData = shouldCalcData ? getTypePercentageData(p, noteSeq, osuText, speedRate, odFlag, cvtFlag) : null;
     if (noteSeq.length <= 0) {
         return {
             status: "NoLN",
@@ -337,6 +381,7 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
             lnSeqByColumn: [],
             lnRatio,
             columnCount,
+            typePercentageData
         };
     }
 
@@ -380,6 +425,7 @@ function preprocessFile(osuText, speedRate, odFlag, cvtFlag) {
     lnSeqByColumn,
     lnRatio,
     columnCount,
+    typePercentageData
     };
 }
 
@@ -933,6 +979,7 @@ function smoothDForGraph(allCorners, DAll, noteSeq) {
 
 const MIN_LN_PERCENTAGE = 20; // 20%
 const MIN_LN_DENSITY = MIN_LN_PERCENTAGE * 0.01;
+const TYPELN_MIN_LN_DENSITY = 90 * 0.01; // 90%
 
 /**
  * 解析 .osu 文本中的 timing points。
@@ -1024,7 +1071,8 @@ function computeLNDuration(p, timeStart, timeEnd, noteStartIdx, noteEndIdx) {
     return merged;
 }
 
-function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
+function getLNParts(pureLN, osuText, _speedRate, odFlag, cvtFlag) {
+    const MinLNDensity = pureLN ? TYPELN_MIN_LN_DENSITY : MIN_LN_DENSITY;
     const pObj = new OsuFileParser(osuText);
     pObj.process();
     let p = pObj.getParsedData();
@@ -1069,9 +1117,9 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
     }
 
     // 判断 LN 占比是否达到阈值（基于音符数量）
-    function isLNPercentageValid(riceCount, LNCount) {
+    function isLNPercentageValid(riceCount, LNCount, MinLnDensity) {
         if (riceCount + LNCount === 0) return false;
-        return (LNCount / (riceCount + LNCount)) > MIN_LN_DENSITY;
+        return (LNCount / (riceCount + LNCount)) > MinLnDensity;
     }
 
     /**
@@ -1123,7 +1171,7 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
             continue;
         }
 
-        if (isLNPercentageValid(block.riceCount, block.lnCount)) {
+        if (isLNPercentageValid(block.riceCount, block.lnCount, MinLNDensity)) {
             // 强区块：向后扩展，条件是下一个区块 >25% LN 时长 且 合并后 >20% LN 占比
             let extendEnd = blockEnd;
             let extendNoteEnd = block.noteEndIdx;
@@ -1139,7 +1187,7 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
                 // 基于时长判断：下一个区块 LN 时长覆盖 >25%？
                 if (!isLNDurationValid(peek.noteStartIdx, peek.noteEndIdx, nextStart, nextEnd, 0.25)) break;
                 // 合并后 LN 占比 >20%？
-                if (!isLNPercentageValid(accumRC + peek.riceCount, accumLN + peek.lnCount)) break;
+                if (!isLNPercentageValid(accumRC + peek.riceCount, accumLN + peek.lnCount, MinLNDensity)) break;
 
                 extendEnd = nextEnd;
                 extendNoteEnd = peek.noteEndIdx;
@@ -1151,12 +1199,12 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
             WindowList1.push([block.noteStartIdx, extendNoteEnd]);
             blockStart = extendEnd;
         } else {
-            // 弱区块：窥视下一个区块，如果 LN 时长覆盖 >25% → 扩展1个单位
+            // 弱区块：窥视下一个区块，如果 LN 时长覆盖 >25% → 扩展1个单位；这一机制在纯LN检测时被禁用
             const nextStart = blockEnd;
             const nextEnd = nextStart + getBlockLength(nextStart);
             const peek = countNotesInRange(nextStart, nextEnd, scanIndex);
 
-            if (peek.noteStartIdx !== -1 && isLNDurationValid(peek.noteStartIdx, peek.noteEndIdx, nextStart, nextEnd, 0.25)) {
+            if (peek.noteStartIdx !== -1 && !pureLN && isLNDurationValid(peek.noteStartIdx, peek.noteEndIdx, nextStart, nextEnd, 0.25)) {
                 WindowList1.push([block.noteStartIdx, peek.noteEndIdx]);
                 scanIndex = peek.nextIndex;
                 blockStart = nextEnd;
@@ -1195,8 +1243,8 @@ function getLNParts(osuText, _speedRate, odFlag, cvtFlag) {
     return WindowList2;
 }
     
-function getCuttedNoteSeq(p, noteSeq_Temp) {
-    // 截取有LN覆盖的时间（当前版本不考虑单手情况，改成只有单手也简单）
+function getCuttedNoteSeq(noteSeq_Temp) {
+    // 截取有LN覆盖的时间（当前版本不考虑单手情况，改成只有单手也简单） 如果改成单手记得改
     const LNTimes = [];
     
     // 第一步：框出所有区间
@@ -1235,7 +1283,6 @@ function getCuttedNoteSeq(p, noteSeq_Temp) {
 
 export function calculateLN(osuText, speedRate = 1.0, odFlag = null, cvtFlag = null, options = {}) {
     const withGraph = options?.withGraph === true;
-    const shouldCalcTypePercentage = true; // 记得改成选项
 
     const {
     status,
@@ -1253,10 +1300,7 @@ export function calculateLN(osuText, speedRate = 1.0, odFlag = null, cvtFlag = n
 
     if (status === "Fail") return -1;
     if (status === "NotMania") return -2;
-    if (status === "NoLN") {
-        if (!shouldCalcTypePercentage) return -3;
-        return {NoLN: true, typePercentageData: typePercentageData}
-    }
+    if (status === "NoLN") return {NoLN: true, typePercentageData: typePercentageData}
     if (!noteSeq.length || K <= 0) return -1;
 
     const { allCorners, baseCorners, ACorners } = getCorners(T, noteSeq);
