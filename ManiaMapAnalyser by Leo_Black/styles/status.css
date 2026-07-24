@@ -3,9 +3,7 @@
     left: 12px;
     bottom: 10px;
     z-index: 2;
-    display: flex;
     align-items: center;
-    gap: 6px;
     pointer-events: none;
 }
 
@@ -22,6 +20,7 @@
     background: rgba(55, 71, 115, 0.72);
     pointer-events: none;
     transition: background-color 220ms ease, color 220ms ease, border-color 220ms ease;
+    margin: 0 2px;
 }
 
 .mode-tag.capsule-switch {
